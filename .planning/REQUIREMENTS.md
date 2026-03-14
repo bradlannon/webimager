@@ -22,8 +22,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Crop
 
-- [ ] **CROP-01**: User can free-drag a resizable rectangle to crop the image
-- [ ] **CROP-02**: User can lock crop to aspect ratio presets (16:9, 1:1, 4:3, etc.)
+- [x] **CROP-01**: User can free-drag a resizable rectangle to crop the image
+- [x] **CROP-02**: User can lock crop to aspect ratio presets (16:9, 1:1, 4:3, etc.)
 
 ### Adjustments
 
@@ -72,8 +72,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TRAN-01 | Phase 3 | Complete |
 | TRAN-02 | Phase 1 | Complete |
 | TRAN-03 | Phase 1 | Complete |
-| CROP-01 | Phase 3 | Pending |
-| CROP-02 | Phase 3 | Pending |
+| CROP-01 | Phase 3 | Complete |
+| CROP-02 | Phase 3 | Complete |
 | ADJT-01 | Phase 2 | Complete |
 | ADJT-02 | Phase 2 | Complete |
 | ADJT-03 | Phase 2 | Complete |

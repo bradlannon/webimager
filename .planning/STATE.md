@@ -53,6 +53,7 @@ Progress: [██████████] 100%
 | Phase 02 P01 | 3min | 2 tasks | 9 files |
 | Phase 02 P02 | 4min | 2 tasks | 2 files |
 | Phase 03 P01 | 4min | 2 tasks | 10 files |
+| Phase 03 P02 | 12min | 3 tasks | 8 files |
 | Phase 03 P03 | 3min | 2 tasks | 2 files |
 
 ## Accumulated Context
@@ -76,6 +77,9 @@ Recent decisions affecting current work:
 - [Phase 03]: [03-01]: Percentage-based crop coordinates (0-100) for resolution independence
 - [Phase 03]: [03-01]: Offscreen canvas approach for crop extraction after rotation
 - [Phase 03]: [03-01]: Crop rendered only outside crop mode for overlay positioning
+- [Phase 03]: [03-02]: Pointer Events API with setPointerCapture for reliable cross-device drag
+- [Phase 03]: [03-02]: CSS clip-path polygon for dim overlay with transparent crop hole
+- [Phase 03]: [03-02]: Crop coordinates transformed on rotation/flip to maintain correct position
 
 ### Pending Todos
 

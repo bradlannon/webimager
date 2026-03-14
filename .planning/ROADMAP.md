@@ -63,8 +63,8 @@ Plans:
 
 Plans:
 - [x] 03-01-PLAN.md — Crop/resize data layer: types, math utilities, store, render pipeline (TDD)
-- [ ] 03-02-PLAN.md — CropOverlay and CropToolbar UI, Canvas/Editor/Sidebar wiring
-- [ ] 03-03-PLAN.md — ResizeControls UI component and sidebar integration
+- [x] 03-02-PLAN.md — CropOverlay and CropToolbar UI, Canvas/Editor/Sidebar wiring
+- [x] 03-03-PLAN.md — ResizeControls UI component and sidebar integration
 
 ## Progress
 
