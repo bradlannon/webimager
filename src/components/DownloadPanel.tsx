@@ -61,7 +61,7 @@ export function DownloadPanel() {
             max={100}
             value={quality}
             onChange={(e) => setQuality(Number(e.target.value))}
-            className="w-full accent-blue-600"
+            className="w-full"
           />
         </div>
       )}
@@ -70,7 +70,7 @@ export function DownloadPanel() {
         type="button"
         disabled={!sourceImage}
         onClick={handleDownload}
-        className="flex items-center justify-center gap-2 w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+        className="flex items-center justify-center gap-2 w-full px-4 py-2 bg-[#2A9D8F] text-white rounded-lg hover:bg-[#238578] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
       >
         <Download className="w-4 h-4" />
         Download

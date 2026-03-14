@@ -2,9 +2,6 @@ import { Palette } from 'lucide-react';
 import { useEditorStore } from '../store/editorStore';
 import type { Adjustments } from '../types/editor';
 
-const sliderClass =
-  'w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-neutral-200 dark:bg-neutral-600 accent-blue-500 dark:accent-blue-400';
-
 const sliders: { key: keyof Omit<Adjustments, 'greyscale'>; label: string }[] = [
   { key: 'brightness', label: 'Brightness' },
   { key: 'contrast', label: 'Contrast' },
@@ -39,7 +36,7 @@ export function AdjustmentControls() {
             step={1}
             value={adjustments[key]}
             onChange={(e) => setAdjustment(key, Number(e.target.value))}
-            className={sliderClass}
+            className="w-full"
           />
         </div>
       ))}
