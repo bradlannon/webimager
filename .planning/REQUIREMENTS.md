@@ -1,45 +1,30 @@
-# Requirements: WebImager
+# Requirements: WebImager v2.0
 
-**Defined:** 2026-03-13
+**Defined:** 2026-03-14
 **Core Value:** Users can quickly edit a photo and download the result without installing software, creating an account, or uploading to a server.
 
-## v1 Requirements
+## v2.0 Requirements
 
-Requirements for initial release. Each maps to roadmap phases.
+Requirements for v2.0 milestone. Each maps to roadmap phases.
 
-### File I/O
+### Background Removal
 
-- [x] **FILE-01**: User can upload an image via drag-and-drop or file picker (JPEG, PNG, WebP)
-- [x] **FILE-02**: Images exceeding safe canvas pixel limits are auto-downscaled on upload with notification
-- [x] **FILE-03**: EXIF orientation is auto-corrected on upload so photos display correctly
-- [x] **FILE-04**: User can download processed image as JPEG or PNG with quality slider
+- [ ] **BGREM-01**: User can remove image background with one click using in-browser AI model
+- [ ] **BGREM-02**: User sees a progress bar during model download on first use (~45MB)
+- [ ] **BGREM-03**: User sees a progress/loading indicator during background removal inference
+- [ ] **BGREM-04**: Transparent areas display on checkerboard background
+- [ ] **BGREM-05**: User can restore the original background with one click
+- [ ] **BGREM-06**: User can replace transparent background with a solid color (white, black, or custom picker)
 
-### Transforms
+### Export Integration
 
-- [x] **TRAN-01**: User can resize image by entering width/height with aspect ratio lock toggle
-- [x] **TRAN-02**: User can rotate image 90 degrees left or right
-- [x] **TRAN-03**: User can flip image horizontally or vertically
+- [ ] **EXPT-01**: Download format auto-switches to PNG when transparency is active
+- [ ] **EXPT-02**: JPEG export fills transparent areas with white
+- [ ] **EXPT-03**: Warning shown when user selects JPEG with transparency active
 
-### Crop
+## Future Requirements
 
-- [x] **CROP-01**: User can free-drag a resizable rectangle to crop the image
-- [x] **CROP-02**: User can lock crop to aspect ratio presets (16:9, 1:1, 4:3, etc.)
-
-### Adjustments
-
-- [x] **ADJT-01**: User can adjust brightness via slider with live preview
-- [x] **ADJT-02**: User can adjust contrast via slider with live preview
-- [x] **ADJT-03**: User can adjust saturation via slider with live preview
-- [x] **ADJT-04**: User can convert image to greyscale with one click
-
-### UX
-
-- [x] **UX-01**: All effects render as live preview in real-time
-- [x] **UX-02**: Privacy indicator shows users their photo never leaves the browser
-
-## v2 Requirements
-
-Deferred to future release. Tracked but not in current roadmap.
+Deferred to future milestone. Tracked but not in current roadmap.
 
 ### Effects
 
@@ -47,17 +32,19 @@ Deferred to future release. Tracked but not in current roadmap.
 - **EFCT-02**: User can apply sharpen with adjustable intensity
 - **EFCT-03**: User can apply preset filters (sepia, vintage, warm, cool, etc.)
 
+### UX Enhancements
+
+- **UX-03**: Before/after comparison toggle
+- **UX-04**: Edge feathering/softness control for background removal
+
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| User accounts / authentication | No server, no state -- client-side only |
-| Batch processing | Single image workflow for v1 simplicity |
-| Backend processing | Core constraint -- everything runs in-browser |
-| Mobile-native app | Web-only; should be responsive but not native |
-| Layers / undo history stack | Keeps it simple, not Photoshop |
-| Before/after comparison | Live preview is sufficient for v1 |
-| AI-powered effects | Requires large model downloads or server -- violates constraints |
+| Manual mask painting/eraser | Introduces layer-system complexity — beyond v2.0 scope |
+| Batch background removal | Single image workflow |
+| Background image replacement | Requires layer compositing — beyond v2.0 scope |
+| Server-side inference | Violates client-only constraint |
 
 ## Traceability
 
@@ -65,27 +52,21 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FILE-01 | Phase 1 | Complete |
-| FILE-02 | Phase 1 | Complete |
-| FILE-03 | Phase 1 | Complete |
-| FILE-04 | Phase 1 | Complete |
-| TRAN-01 | Phase 3 | Complete |
-| TRAN-02 | Phase 1 | Complete |
-| TRAN-03 | Phase 1 | Complete |
-| CROP-01 | Phase 3 | Complete |
-| CROP-02 | Phase 3 | Complete |
-| ADJT-01 | Phase 2 | Complete |
-| ADJT-02 | Phase 2 | Complete |
-| ADJT-03 | Phase 2 | Complete |
-| ADJT-04 | Phase 2 | Complete |
-| UX-01 | Phase 1 | Complete |
-| UX-02 | Phase 1 | Complete |
+| BGREM-01 | — | Pending |
+| BGREM-02 | — | Pending |
+| BGREM-03 | — | Pending |
+| BGREM-04 | — | Pending |
+| BGREM-05 | — | Pending |
+| BGREM-06 | — | Pending |
+| EXPT-01 | — | Pending |
+| EXPT-02 | — | Pending |
+| EXPT-03 | — | Pending |
 
 **Coverage:**
-- v1 requirements: 15 total
-- Mapped to phases: 15
-- Unmapped: 0
+- v2.0 requirements: 9 total
+- Mapped to phases: 0
+- Unmapped: 9 ⚠️
 
 ---
-*Requirements defined: 2026-03-13*
-*Last updated: 2026-03-13 after roadmap creation*
+*Requirements defined: 2026-03-14*
+*Last updated: 2026-03-14 after initial definition*
