@@ -52,21 +52,21 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BGREM-01 | — | Pending |
-| BGREM-02 | — | Pending |
-| BGREM-03 | — | Pending |
-| BGREM-04 | — | Pending |
-| BGREM-05 | — | Pending |
-| BGREM-06 | — | Pending |
-| EXPT-01 | — | Pending |
-| EXPT-02 | — | Pending |
-| EXPT-03 | — | Pending |
+| BGREM-01 | Phase 4 | Pending |
+| BGREM-02 | Phase 4 | Pending |
+| BGREM-03 | Phase 4 | Pending |
+| BGREM-04 | Phase 4 | Pending |
+| BGREM-05 | Phase 4 | Pending |
+| BGREM-06 | Phase 5 | Pending |
+| EXPT-01 | Phase 5 | Pending |
+| EXPT-02 | Phase 5 | Pending |
+| EXPT-03 | Phase 5 | Pending |
 
 **Coverage:**
 - v2.0 requirements: 9 total
-- Mapped to phases: 0
-- Unmapped: 9 ⚠️
+- Mapped to phases: 9
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-14*
-*Last updated: 2026-03-14 after initial definition*
+*Last updated: 2026-03-14 after roadmap creation*
