@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Crop, RotateCw, SlidersHorizontal, Eraser, Maximize, Download } from 'lucide-react';
+import { Crop, RotateCw, SlidersHorizontal, Eraser, Maximize, Download, Undo2 } from 'lucide-react';
 import { OverlayPanel } from './OverlayPanel';
 import { TransformControls } from './TransformControls';
 import { AdjustmentControls } from './AdjustmentControls';
@@ -7,6 +7,7 @@ import { BackgroundControls } from './BackgroundControls';
 import { ResizeControls } from './ResizeControls';
 import { DownloadPanel } from './DownloadPanel';
 import { useEditorStore } from '../store/editorStore';
+import { CROP_PRESETS, constrainToAspectRatio } from '../utils/crop';
 
 export type TabId = 'crop' | 'transform' | 'adjustments' | 'background' | 'resize' | 'download';
 
@@ -25,10 +26,67 @@ const tabs: Tab[] = [
   { id: 'download', label: 'Download', icon: Download },
 ];
 
+function CropPanel() {
+  const cropRegion = useEditorStore((s) => s.cropRegion);
+  const setCrop = useEditorStore((s) => s.setCrop);
+  const cropAspectRatio = useEditorStore((s) => s.cropAspectRatio);
+  const setCropAspectRatio = useEditorStore((s) => s.setCropAspectRatio);
+  const undoCrop = useEditorStore((s) => s.undoCrop);
+  const previousCropRegion = useEditorStore((s) => s.previousCropRegion);
+  const sourceImage = useEditorStore((s) => s.sourceImage);
+  const transforms = useEditorStore((s) => s.transforms);
+
+  const isRotated90 = transforms.rotation === 90 || transforms.rotation === 270;
+  const sourceW = sourceImage ? (isRotated90 ? sourceImage.height : sourceImage.width) : 1;
+  const sourceH = sourceImage ? (isRotated90 ? sourceImage.width : sourceImage.height) : 1;
+
+  const handlePresetClick = (ratio: number | null) => {
+    setCropAspectRatio(ratio);
+    if (ratio !== null && cropRegion) {
+      const constrained = constrainToAspectRatio(cropRegion.width, cropRegion.height, ratio, sourceW, sourceH);
+      setCrop({ ...cropRegion, width: constrained.width, height: constrained.height });
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        {CROP_PRESETS.map((preset, i) => {
+          const isActive = preset.ratio === null ? cropAspectRatio === null : cropAspectRatio !== null && Math.abs(preset.ratio - cropAspectRatio) < 0.001;
+          return (
+            <button
+              key={`${preset.label}-${i}`}
+              type="button"
+              onClick={() => handlePresetClick(preset.ratio)}
+              className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
+                isActive
+                  ? 'bg-[#2A9D8F] text-white'
+                  : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+              }`}
+            >
+              {preset.label}
+            </button>
+          );
+        })}
+      </div>
+      {previousCropRegion && (
+        <button
+          type="button"
+          onClick={undoCrop}
+          className="flex items-center gap-1.5 text-sm text-neutral-600 hover:text-[#2A9D8F] transition-colors"
+        >
+          <Undo2 className="w-4 h-4" />
+          Undo Crop
+        </button>
+      )}
+    </div>
+  );
+}
+
 function PanelContent({ tabId }: { tabId: TabId }) {
   switch (tabId) {
     case 'crop':
-      return null;
+      return <CropPanel />;
     case 'transform':
       return <TransformControls />;
     case 'adjustments':
@@ -46,29 +104,24 @@ export function BottomBar() {
   const [activeTab, setActiveTab] = useState<TabId | null>(null);
   const cropMode = useEditorStore((s) => s.cropMode);
 
-  // Auto-close panel when crop mode activates to give full canvas space
-  useEffect(() => {
-    if (cropMode) {
-      setActiveTab(null);
-    }
-  }, [cropMode]);
-
   const enterCropMode = useEditorStore((s) => s.enterCropMode);
-
   const applyCrop = useEditorStore((s) => s.applyCrop);
 
   const handleTabClick = (tabId: TabId) => {
     if (tabId === 'crop') {
-      if (cropMode) {
-        // Tapping crop again exits and auto-saves
+      if (activeTab === 'crop') {
+        // Closing crop panel — auto-save and exit crop mode
         applyCrop();
+        setActiveTab(null);
       } else {
+        // Opening crop panel — enter crop mode
+        if (cropMode) applyCrop(); // save any in-progress crop from switching
         enterCropMode();
+        setActiveTab('crop');
       }
-      setActiveTab(null);
       return;
     }
-    // If switching away from crop mode to another tab, auto-save crop
+    // Switching away from crop to another tab — auto-save crop
     if (cropMode) {
       applyCrop();
     }
@@ -76,6 +129,10 @@ export function BottomBar() {
   };
 
   const handleClosePanel = () => {
+    // If closing crop panel via backdrop tap, auto-save
+    if (activeTab === 'crop' && cropMode) {
+      applyCrop();
+    }
     setActiveTab(null);
   };
 
