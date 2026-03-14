@@ -6,7 +6,7 @@ import { downloadImage } from '../utils/download';
 type Format = 'image/jpeg' | 'image/png';
 
 export function DownloadPanel() {
-  const { sourceImage, transforms, adjustments, originalFile, cropRegion } = useEditorStore();
+  const { sourceImage, transforms, adjustments, originalFile, cropRegion, backgroundRemoved, backgroundMask } = useEditorStore();
   const [format, setFormat] = useState<Format>('image/jpeg');
   const [quality, setQuality] = useState(85);
 
@@ -19,7 +19,7 @@ export function DownloadPanel() {
       : 'edited';
     const filename = `${stem}${ext}`;
 
-    downloadImage(sourceImage, transforms, adjustments, format, quality / 100, filename, cropRegion ?? undefined);
+    downloadImage(sourceImage, transforms, adjustments, format, quality / 100, filename, cropRegion ?? undefined, backgroundRemoved ? backgroundMask : undefined);
   };
 
   return (
