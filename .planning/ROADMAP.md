@@ -69,7 +69,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — Add fonts, glassmorphism CSS, create TopBar + BottomBar + OverlayPanel components
+- [x] 06-01-PLAN.md — Add fonts, glassmorphism CSS, create TopBar + BottomBar + OverlayPanel components
 - [ ] 06-02-PLAN.md — Rewire Editor layout, populate panels with controls, restyle sliders, visual checkpoint
 
 ## Progress
@@ -84,4 +84,4 @@ Phases execute in numeric order: 4 → 5 → 6
 | 3. Crop & Resize | v1.0 | 3/3 | Complete | 2026-03-14 |
 | 4. Background Removal Engine | 2/3 | In Progress|  | - |
 | 5. Export and Background Replacement | v2.0 | 0/? | Not started | - |
-| 6. Sidebar Redesign | v2.0 | 0/2 | Not started | - |
+| 6. Sidebar Redesign | v2.0 | 1/2 | In Progress | - |
