@@ -55,12 +55,22 @@ export function BottomBar() {
 
   const enterCropMode = useEditorStore((s) => s.enterCropMode);
 
+  const applyCrop = useEditorStore((s) => s.applyCrop);
+
   const handleTabClick = (tabId: TabId) => {
     if (tabId === 'crop') {
-      // Crop tab directly enters crop mode instead of opening a panel
-      if (!cropMode) enterCropMode();
+      if (cropMode) {
+        // Tapping crop again exits and auto-saves
+        applyCrop();
+      } else {
+        enterCropMode();
+      }
       setActiveTab(null);
       return;
+    }
+    // If switching away from crop mode to another tab, auto-save crop
+    if (cropMode) {
+      applyCrop();
     }
     setActiveTab((current) => (current === tabId ? null : tabId));
   };

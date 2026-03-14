@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Check, X } from 'lucide-react';
+import { Check, RotateCcw } from 'lucide-react';
 import { useEditorStore } from '../store/editorStore';
 import { CROP_PRESETS, constrainToAspectRatio } from '../utils/crop';
 
 export function CropToolbar() {
   const applyCrop = useEditorStore((s) => s.applyCrop);
-  const exitCropMode = useEditorStore((s) => s.exitCropMode);
   const clearCrop = useEditorStore((s) => s.clearCrop);
   const cropRegion = useEditorStore((s) => s.cropRegion);
   const setCrop = useEditorStore((s) => s.setCrop);
@@ -13,12 +12,6 @@ export function CropToolbar() {
   const setCropAspectRatio = useEditorStore((s) => s.setCropAspectRatio);
   const sourceImage = useEditorStore((s) => s.sourceImage);
   const transforms = useEditorStore((s) => s.transforms);
-
-  // Track whether a crop existed before entering crop mode
-  const [hadCropBefore] = useState(() => {
-    const region = useEditorStore.getState().cropRegion;
-    return region !== null && !(region.x === 0 && region.y === 0 && region.width === 100 && region.height === 100);
-  });
 
   // Get source dimensions (post-rotation)
   const isRotated90 = transforms.rotation === 90 || transforms.rotation === 270;
@@ -60,16 +53,14 @@ export function CropToolbar() {
     }
   };
 
-  const handleApply = () => {
+  // Done = auto-save the crop and exit
+  const handleDone = () => {
     applyCrop();
   };
 
-  const handleCancel = () => {
-    if (!hadCropBefore) {
-      clearCrop();
-    } else {
-      exitCropMode();
-    }
+  // Reset = clear the crop entirely
+  const handleReset = () => {
+    clearCrop();
   };
 
   return (
@@ -94,20 +85,20 @@ export function CropToolbar() {
 
       <button
         type="button"
-        onClick={handleCancel}
+        onClick={handleReset}
         className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200 rounded-md transition-colors"
       >
-        <X className="w-4 h-4" />
-        Cancel
+        <RotateCcw className="w-4 h-4" />
+        Reset
       </button>
 
       <button
         type="button"
-        onClick={handleApply}
-        className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors"
+        onClick={handleDone}
+        className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-white bg-[#2A9D8F] hover:bg-[#238578] rounded-md transition-colors"
       >
         <Check className="w-4 h-4" />
-        Apply
+        Done
       </button>
     </div>
   );
