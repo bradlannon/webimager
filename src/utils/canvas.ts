@@ -37,7 +37,8 @@ export function renderToCanvas(
   transforms: Transforms,
   adjustments?: Adjustments,
   crop?: CropRegion,
-  backgroundMask?: ImageData | null
+  backgroundMask?: ImageData | null,
+  replacementColor?: string | null
 ): void {
   const { rotation, freeRotation = 0, flipH, flipV } = transforms;
   const totalRotation = rotation + freeRotation;
@@ -109,6 +110,14 @@ export function renderToCanvas(
       ctx.drawImage(maskCropped, 0, 0);
       ctx.globalCompositeOperation = 'source-over';
     }
+
+    // Fill replacement color behind the masked subject
+    if (replacementColor) {
+      ctx.globalCompositeOperation = 'destination-over';
+      ctx.fillStyle = replacementColor;
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      ctx.globalCompositeOperation = 'source-over';
+    }
   } else {
     // No crop: existing fast path
     ctx.canvas.width = rotatedW;
@@ -146,6 +155,14 @@ export function renderToCanvas(
       // Composite: keep only pixels where mask has alpha
       ctx.globalCompositeOperation = 'destination-in';
       ctx.drawImage(maskCanvas, 0, 0);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    // Fill replacement color behind the masked subject
+    if (replacementColor) {
+      ctx.globalCompositeOperation = 'destination-over';
+      ctx.fillStyle = replacementColor;
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
       ctx.globalCompositeOperation = 'source-over';
     }
   }

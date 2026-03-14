@@ -13,13 +13,14 @@ export function downloadImage(
   quality: number,
   filename?: string,
   crop?: CropRegion,
-  backgroundMask?: ImageData | null
+  backgroundMask?: ImageData | null,
+  replacementColor?: string | null
 ): void {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  renderToCanvas(ctx, source, transforms, adjustments, crop, backgroundMask);
+  renderToCanvas(ctx, source, transforms, adjustments, crop, backgroundMask, replacementColor);
 
   const ext = format === 'image/jpeg' ? '.jpg' : '.png';
   const qualityParam = format === 'image/jpeg' ? quality : undefined;

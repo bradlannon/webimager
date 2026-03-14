@@ -15,6 +15,7 @@ describe('editorStore', () => {
       cropMode: false,
       backgroundRemoved: false,
       backgroundMask: null,
+      replacementColor: null,
     })
   })
 
@@ -316,6 +317,8 @@ describe('editorStore', () => {
   })
 
   describe('replacementColor', () => {
+    const mockMask = { data: new Uint8ClampedArray(4), width: 1, height: 1 } as unknown as ImageData
+
     test('setReplacementColor sets replacementColor to a hex value', () => {
       useEditorStore.getState().setReplacementColor('#ff0000')
       expect(useEditorStore.getState().replacementColor).toBe('#ff0000')

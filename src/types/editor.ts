@@ -27,6 +27,7 @@ export interface EditorState {
   adjustments: Adjustments;
   backgroundRemoved: boolean;
   backgroundMask: ImageData | null;
+  replacementColor: string | null;
 }
 
 export const defaultTransforms: Transforms = {
