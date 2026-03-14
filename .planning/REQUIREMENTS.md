@@ -16,7 +16,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Transforms
 
-- [ ] **TRAN-01**: User can resize image by entering width/height with aspect ratio lock toggle
+- [x] **TRAN-01**: User can resize image by entering width/height with aspect ratio lock toggle
 - [x] **TRAN-02**: User can rotate image 90 degrees left or right
 - [x] **TRAN-03**: User can flip image horizontally or vertically
 
@@ -69,7 +69,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FILE-02 | Phase 1 | Complete |
 | FILE-03 | Phase 1 | Complete |
 | FILE-04 | Phase 1 | Complete |
-| TRAN-01 | Phase 3 | Pending |
+| TRAN-01 | Phase 3 | Complete |
 | TRAN-02 | Phase 1 | Complete |
 | TRAN-03 | Phase 1 | Complete |
 | CROP-01 | Phase 3 | Pending |

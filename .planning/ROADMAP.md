@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation** - Upload pipeline, canvas renderer, transforms, download, and live preview (completed 2026-03-14)
 - [x] **Phase 2: Adjustments** - Brightness, contrast, saturation, and greyscale controls (completed 2026-03-14)
-- [ ] **Phase 3: Crop & Resize** - Free-drag crop with custom overlay and resize with aspect ratio lock
+- [x] **Phase 3: Crop & Resize** - Free-drag crop with custom overlay and resize with aspect ratio lock (completed 2026-03-14)
 
 ## Phase Details
 
@@ -59,7 +59,7 @@ Plans:
   2. User can lock crop to aspect ratio presets (16:9, 1:1, 4:3, etc.)
   3. User can enter width and height to resize the image with an aspect ratio lock toggle
   4. Crop and resize produce correct output at full source resolution (not display-scaled)
-**Plans:** 1/3 plans complete
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 03-01-PLAN.md — Crop/resize data layer: types, math utilities, store, render pipeline (TDD)
@@ -75,4 +75,4 @@ Phases execute in numeric order: 1 -> 2 -> 3
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete    | 2026-03-14 |
 | 2. Adjustments | 2/2 | Complete    | 2026-03-14 |
-| 3. Crop & Resize | 1/3 | In progress | - |
+| 3. Crop & Resize | 3/3 | Complete   | 2026-03-14 |
