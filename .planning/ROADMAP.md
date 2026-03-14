@@ -75,4 +75,4 @@ Phases execute in numeric order: 1 -> 2 -> 3
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete    | 2026-03-14 |
 | 2. Adjustments | 2/2 | Complete    | 2026-03-14 |
-| 3. Crop & Resize | 3/3 | Complete   | 2026-03-14 |
+| 3. Crop & Resize | 3/3 | Complete    | 2026-03-14 |
