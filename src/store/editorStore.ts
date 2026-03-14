@@ -21,12 +21,19 @@ interface EditorStore {
   cropMode: boolean;
   cropAspectRatio: number | null;
 
+  // Zoom/pan state
+  zoomLevel: number;
+  panOffset: { x: number; y: number };
+
   // Background removal state
   backgroundRemoved: boolean;
   backgroundMask: ImageData | null;
   replacementColor: string | null;
 
   // Actions
+  setZoom: (level: number) => void;
+  setPan: (offset: { x: number; y: number }) => void;
+  resetView: () => void;
   setImage: (bitmap: ImageBitmap, file: File, wasDownscaled: boolean) => void;
   rotateLeft: () => void;
   rotateRight: () => void;
@@ -64,9 +71,15 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   previousCropRegion: null,
   cropMode: false,
   cropAspectRatio: null,
+  zoomLevel: 1,
+  panOffset: { x: 0, y: 0 },
   backgroundRemoved: false,
   backgroundMask: null,
   replacementColor: null,
+
+  setZoom: (level) => set({ zoomLevel: level }),
+  setPan: (offset) => set({ panOffset: offset }),
+  resetView: () => set({ zoomLevel: 1, panOffset: { x: 0, y: 0 } }),
 
   setImage: (bitmap, file, wasDownscaled) => {
     const old = get().sourceImage;
@@ -83,6 +96,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       backgroundRemoved: false,
       backgroundMask: null,
       replacementColor: null,
+      zoomLevel: 1,
+      panOffset: { x: 0, y: 0 },
     });
   },
 
@@ -141,6 +156,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     backgroundRemoved: false,
     backgroundMask: null,
     replacementColor: null,
+    zoomLevel: 1,
+    panOffset: { x: 0, y: 0 },
   }),
 
   setBackgroundMask: (mask) => set({ backgroundMask: mask, backgroundRemoved: true }),
@@ -152,15 +169,17 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     set((s) => ({
       cropMode: true,
       cropRegion: s.cropRegion ?? { ...defaultCrop },
+      zoomLevel: 1,
+      panOffset: { x: 0, y: 0 },
     })),
 
-  exitCropMode: () => set({ cropMode: false }),
+  exitCropMode: () => set({ cropMode: false, zoomLevel: 1, panOffset: { x: 0, y: 0 } }),
 
   setCrop: (region) => set({ cropRegion: clampCrop(region) }),
 
-  applyCrop: () => set((s) => ({ cropMode: false, previousCropRegion: s.cropRegion })),
+  applyCrop: () => set((s) => ({ cropMode: false, previousCropRegion: s.cropRegion, zoomLevel: 1, panOffset: { x: 0, y: 0 } })),
 
-  clearCrop: () => set((s) => ({ cropRegion: null, previousCropRegion: s.cropRegion, cropMode: false, cropAspectRatio: null })),
+  clearCrop: () => set((s) => ({ cropRegion: null, previousCropRegion: s.cropRegion, cropMode: false, cropAspectRatio: null, zoomLevel: 1, panOffset: { x: 0, y: 0 } })),
 
   undoCrop: () => set((s) => {
     // Swap current and previous crop (enables redo by clicking undo again)
