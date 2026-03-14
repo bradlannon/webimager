@@ -1,6 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Crop, RotateCw, SlidersHorizontal, Eraser, Maximize, Download } from 'lucide-react';
 import { OverlayPanel } from './OverlayPanel';
+import { TransformControls } from './TransformControls';
+import { AdjustmentControls } from './AdjustmentControls';
+import { BackgroundControls } from './BackgroundControls';
+import { ResizeControls } from './ResizeControls';
+import { DownloadPanel } from './DownloadPanel';
+import { useEditorStore } from '../store/editorStore';
 
 export type TabId = 'crop' | 'transform' | 'adjustments' | 'background' | 'resize' | 'download';
 
@@ -19,8 +25,52 @@ const tabs: Tab[] = [
   { id: 'download', label: 'Download', icon: Download },
 ];
 
+function CropPanel() {
+  const cropMode = useEditorStore((s) => s.cropMode);
+  const enterCropMode = useEditorStore((s) => s.enterCropMode);
+
+  return (
+    <div className="space-y-3">
+      <button
+        type="button"
+        onClick={enterCropMode}
+        disabled={cropMode}
+        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-neutral-700 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <Crop className="w-4 h-4" />
+        {cropMode ? 'Crop mode active' : 'Start Crop'}
+      </button>
+    </div>
+  );
+}
+
+function PanelContent({ tabId }: { tabId: TabId }) {
+  switch (tabId) {
+    case 'crop':
+      return <CropPanel />;
+    case 'transform':
+      return <TransformControls />;
+    case 'adjustments':
+      return <AdjustmentControls />;
+    case 'background':
+      return <BackgroundControls />;
+    case 'resize':
+      return <ResizeControls />;
+    case 'download':
+      return <DownloadPanel />;
+  }
+}
+
 export function BottomBar() {
   const [activeTab, setActiveTab] = useState<TabId | null>(null);
+  const cropMode = useEditorStore((s) => s.cropMode);
+
+  // Auto-close panel when crop mode activates to give full canvas space
+  useEffect(() => {
+    if (cropMode) {
+      setActiveTab(null);
+    }
+  }, [cropMode]);
 
   const handleTabClick = (tabId: TabId) => {
     setActiveTab((current) => (current === tabId ? null : tabId));
@@ -34,12 +84,7 @@ export function BottomBar() {
     <>
       {/* Overlay panel */}
       <OverlayPanel open={activeTab !== null} onClose={handleClosePanel}>
-        <div className="text-sm text-neutral-600 dark:text-neutral-400">
-          <p className="font-semibold text-neutral-800 dark:text-neutral-200 mb-2 capitalize">
-            {activeTab ?? ''} Panel
-          </p>
-          <p>Panel content for <span className="font-medium">{activeTab}</span> will be wired in Plan 02.</p>
-        </div>
+        {activeTab && <PanelContent tabId={activeTab} />}
       </OverlayPanel>
 
       {/* Tab bar */}
