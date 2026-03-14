@@ -10,8 +10,9 @@ export function Editor() {
   return (
     <div className="flex flex-col h-screen bg-neutral-100">
       <TopBar />
+      <div style={{ height: '64px' }} className="shrink-0" />
       {cropMode && <CropToolbar />}
-      <div className="relative flex-1 overflow-hidden">
+      <div className="relative flex-1 overflow-hidden pb-[60px]">
         <Canvas />
       </div>
       <BottomBar />

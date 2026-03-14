@@ -57,7 +57,7 @@ export function DropZone() {
       <div
         className={`
           flex flex-col items-center justify-center flex-1 cursor-pointer
-          transition-colors duration-200 mx-6 mb-6 mt-[72px] rounded-2xl
+          transition-colors duration-200 mx-6 mb-6 mt-[80px] rounded-2xl
           ${dragOver
             ? 'border-3 border-dashed border-[#2A9D8F] bg-[#E8F6F3]'
             : 'border-3 border-dashed border-neutral-300 bg-white hover:border-[#2A9D8F]/50 hover:bg-[#FAFAFA]'
