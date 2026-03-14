@@ -103,7 +103,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 08-01-PLAN.md — Fix restoreBackground toggle bug, applyResize background state, dead import cleanup
+- [x] 08-01-PLAN.md — Fix restoreBackground toggle bug, applyResize background state, dead import cleanup
 
 ## Progress
 
@@ -119,4 +119,4 @@ Phases execute in numeric order: 4 → 5 → 6 → 7 → 8
 | 5. Export and Background Replacement | v2.0 | 1/2 | In Progress | - |
 | 6. Sidebar Redesign | 2/2 | Complete   | 2026-03-14 | 2026-03-14 |
 | 7. Pan and Zoom | 2/2 | Complete   | 2026-03-14 | - |
-| 8. BG Removal Bug Fixes | 0/1 | Pending | - | - |
+| 8. BG Removal Bug Fixes | 1/1 | Complete | 2026-03-14 | 2026-03-14 |
