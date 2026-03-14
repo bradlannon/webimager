@@ -13,7 +13,7 @@ WebImager delivers a browser-based image editor in three phases. Phase 1 establi
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation** - Upload pipeline, canvas renderer, transforms, download, and live preview (completed 2026-03-14)
-- [ ] **Phase 2: Adjustments** - Brightness, contrast, saturation, and greyscale controls
+- [x] **Phase 2: Adjustments** - Brightness, contrast, saturation, and greyscale controls (completed 2026-03-14)
 - [ ] **Phase 3: Crop & Resize** - Free-drag crop with Cropper.js and resize with aspect ratio lock
 
 ## Phase Details
@@ -44,7 +44,7 @@ Plans:
   2. User can drag contrast and saturation sliders with immediate visual feedback
   3. User can convert image to greyscale with one click and see instant result
   4. All adjustments compose correctly -- user can combine brightness + contrast + saturation and the result reflects all three
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 02-01-PLAN.md — Adjustment data layer: types, store, render pipeline, unit tests
@@ -72,5 +72,5 @@ Phases execute in numeric order: 1 -> 2 -> 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete    | 2026-03-14 |
-| 2. Adjustments | 0/2 | Not started | - |
+| 2. Adjustments | 0/2 | Complete    | 2026-03-14 |
 | 3. Crop & Resize | 0/? | Not started | - |
