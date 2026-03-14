@@ -36,3 +36,21 @@ export function zoomAtPoint(
 export function clampZoom(value: number): number {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
 }
+
+/**
+ * Transient flag for button-initiated zooms.
+ * When true, Canvas applies a CSS transition for smooth animation.
+ * Automatically cleared after the transition duration.
+ */
+let _smoothZoom = false;
+let _smoothTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function requestSmoothZoom(): void {
+  _smoothZoom = true;
+  if (_smoothTimer) clearTimeout(_smoothTimer);
+  _smoothTimer = setTimeout(() => { _smoothZoom = false; }, 200);
+}
+
+export function isSmoothZoom(): boolean {
+  return _smoothZoom;
+}

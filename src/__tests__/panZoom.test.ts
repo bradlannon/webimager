@@ -175,3 +175,55 @@ describe('editorStore zoom/pan state', () => {
     expect(state.panOffset).toEqual({ x: 0, y: 0 });
   });
 });
+
+describe('ZoomControls store integration', () => {
+  beforeEach(() => {
+    useEditorStore.setState(useEditorStore.getInitialState());
+  });
+
+  it('zoom in via store updates zoomLevel above 1', () => {
+    const store = useEditorStore.getState();
+    const newZoom = clampZoom(store.zoomLevel * 1.25);
+    store.setZoom(newZoom);
+    expect(useEditorStore.getState().zoomLevel).toBe(1.25);
+  });
+
+  it('zoom out via store updates zoomLevel below 1', () => {
+    const store = useEditorStore.getState();
+    const newZoom = clampZoom(store.zoomLevel * 0.8);
+    store.setZoom(newZoom);
+    expect(useEditorStore.getState().zoomLevel).toBe(0.8);
+  });
+
+  it('zoom percentage calculation matches expected format', () => {
+    useEditorStore.getState().setZoom(1.5);
+    const state = useEditorStore.getState();
+    const displayText = Math.round(state.zoomLevel * 100) + '%';
+    expect(displayText).toBe('150%');
+  });
+
+  it('toggle zoom: reset from zoomed restores fit-to-view', () => {
+    const store = useEditorStore.getState();
+    store.setZoom(2);
+    store.setPan({ x: 100, y: 50 });
+    store.resetView();
+    const state = useEditorStore.getState();
+    expect(state.zoomLevel).toBe(1);
+    expect(state.panOffset).toEqual({ x: 0, y: 0 });
+  });
+
+  it('zoom with center-point calculation adjusts pan', () => {
+    const store = useEditorStore.getState();
+    const containerCenter = { x: 400, y: 300 };
+    const newZoom = clampZoom(store.zoomLevel * 1.25);
+    const newPan = zoomAtPoint(containerCenter.x, containerCenter.y, store.zoomLevel, newZoom, store.panOffset);
+    store.setZoom(newZoom);
+    store.setPan(newPan);
+
+    const state = useEditorStore.getState();
+    expect(state.zoomLevel).toBe(1.25);
+    // Pan should be non-zero after center-point zoom from default
+    expect(state.panOffset.x).not.toBe(0);
+    expect(state.panOffset.y).not.toBe(0);
+  });
+});

@@ -2,7 +2,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { useRenderPipeline } from '../hooks/useRenderPipeline';
 import { useEditorStore } from '../store/editorStore';
 import { CropOverlay } from './CropOverlay';
-import { zoomAtPoint, clampZoom } from '../utils/zoom';
+import { zoomAtPoint, clampZoom, isSmoothZoom } from '../utils/zoom';
 
 export function Canvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -274,10 +274,12 @@ export function Canvas() {
 
   // CSS transform for zoom/pan
   // Use translate-then-scale: translate applies in screen space, then scale
+  const smooth = isSmoothZoom();
   const wrapperTransform = zoomLevel !== 1 || panOffset.x !== 0 || panOffset.y !== 0
     ? {
         transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
         transformOrigin: '0 0',
+        ...(smooth ? { transition: 'transform 150ms ease-out' } : {}),
       }
     : {};
 
