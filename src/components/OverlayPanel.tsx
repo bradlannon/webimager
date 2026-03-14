@@ -5,20 +5,23 @@ interface OverlayPanelProps {
   onClose: () => void;
   children: ReactNode;
   className?: string;
+  disableBackdrop?: boolean;
 }
 
-export function OverlayPanel({ open, onClose, children, className = '' }: OverlayPanelProps) {
+export function OverlayPanel({ open, onClose, children, className = '', disableBackdrop = false }: OverlayPanelProps) {
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className={`fixed inset-0 z-30 bg-black/20 transition-opacity duration-250 ease-out ${
-          open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
-        style={{ top: '64px', bottom: '48px' }}
-        onClick={onClose}
-        aria-hidden="true"
-      />
+      {/* Backdrop — disabled during crop mode so canvas interactions work */}
+      {!disableBackdrop && (
+        <div
+          className={`fixed inset-0 z-30 bg-black/20 transition-opacity duration-250 ease-out ${
+            open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          }`}
+          style={{ top: '64px', bottom: '48px' }}
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
 
       {/* Panel */}
       <div

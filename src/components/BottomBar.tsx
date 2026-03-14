@@ -139,7 +139,7 @@ export function BottomBar() {
   return (
     <>
       {/* Overlay panel */}
-      <OverlayPanel open={activeTab !== null} onClose={handleClosePanel}>
+      <OverlayPanel open={activeTab !== null} onClose={handleClosePanel} disableBackdrop={activeTab === 'crop'}>
         {activeTab && <PanelContent tabId={activeTab} />}
       </OverlayPanel>
 
