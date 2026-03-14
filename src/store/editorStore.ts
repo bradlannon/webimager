@@ -17,6 +17,7 @@ interface EditorStore {
 
   // Crop state
   cropRegion: CropRegion | null;
+  previousCropRegion: CropRegion | null;
   cropMode: boolean;
   cropAspectRatio: number | null;
 
@@ -46,6 +47,7 @@ interface EditorStore {
   setCrop: (region: CropRegion) => void;
   applyCrop: () => void;
   clearCrop: () => void;
+  undoCrop: () => void;
   setCropAspectRatio: (ratio: number | null) => void;
   applyResize: (width: number, height: number) => Promise<void>;
 }
@@ -57,6 +59,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   transforms: { ...defaultTransforms },
   adjustments: { ...defaultAdjustments },
   cropRegion: null,
+  previousCropRegion: null,
   cropMode: false,
   cropAspectRatio: null,
   backgroundRemoved: false,
@@ -128,6 +131,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     transforms: { ...defaultTransforms },
     adjustments: { ...defaultAdjustments },
     cropRegion: null,
+    previousCropRegion: null,
     cropMode: false,
     cropAspectRatio: null,
     backgroundRemoved: false,
@@ -148,9 +152,14 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 
   setCrop: (region) => set({ cropRegion: clampCrop(region) }),
 
-  applyCrop: () => set({ cropMode: false }),
+  applyCrop: () => set((s) => ({ cropMode: false, previousCropRegion: s.cropRegion })),
 
-  clearCrop: () => set({ cropRegion: null, cropMode: false, cropAspectRatio: null }),
+  clearCrop: () => set((s) => ({ cropRegion: null, previousCropRegion: s.cropRegion, cropMode: false, cropAspectRatio: null })),
+
+  undoCrop: () => set((s) => {
+    // Swap current and previous crop (enables redo by clicking undo again)
+    return { cropRegion: s.previousCropRegion, previousCropRegion: s.cropRegion };
+  }),
 
   setCropAspectRatio: (ratio) => set({ cropAspectRatio: ratio }),
 

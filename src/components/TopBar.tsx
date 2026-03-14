@@ -1,4 +1,4 @@
-import { ImagePlus, RefreshCw, Info } from 'lucide-react';
+import { ImagePlus, RefreshCw, Info, Undo2, Redo2 } from 'lucide-react';
 import { useEditorStore } from '../store/editorStore';
 
 interface TopBarProps {
@@ -9,6 +9,16 @@ export function TopBar({ showEditorActions = true }: TopBarProps) {
   const wasDownscaled = useEditorStore((s) => s.wasDownscaled);
   const resetAll = useEditorStore((s) => s.resetAll);
   const sourceImage = useEditorStore((s) => s.sourceImage);
+  const cropRegion = useEditorStore((s) => s.cropRegion);
+  const previousCropRegion = useEditorStore((s) => s.previousCropRegion);
+  const undoCrop = useEditorStore((s) => s.undoCrop);
+
+  // Undo is available when there's a previous crop state different from current
+  const hasCrop = cropRegion && !(cropRegion.x === 0 && cropRegion.y === 0 && cropRegion.width === 100 && cropRegion.height === 100);
+  const hasPrevious = previousCropRegion !== null;
+  const canUndo = hasCrop || hasPrevious;
+  // After undo, previous becomes current and vice versa — so redo is just undo again
+  const undoneState = !hasCrop && hasPrevious;
 
   const handleNewImage = () => {
     if (sourceImage) {
@@ -18,10 +28,12 @@ export function TopBar({ showEditorActions = true }: TopBarProps) {
     useEditorStore.setState({ sourceImage: null, originalFile: null, wasDownscaled: false });
   };
 
+  const btnClass = "flex items-center gap-1.5 px-2 md:px-3 py-1.5 text-sm text-[#6B6B6B] hover:text-[#2A9D8F] rounded-md transition-colors disabled:opacity-30 disabled:pointer-events-none";
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b-2 border-[#2A9D8F] shrink-0" style={{ height: '64px' }}>
       <div className="flex items-center justify-between h-full px-4 md:px-[60px]">
-        {/* Navigation links — matches bradlannon.ca exactly */}
+        {/* Navigation links */}
         <nav className="flex items-center gap-4 md:gap-9">
           <a
             href="https://bradlannon.ca/index.html#portfolio"
@@ -46,19 +58,29 @@ export function TopBar({ showEditorActions = true }: TopBarProps) {
           </a>
         </nav>
 
-        {/* Right side: info badge + action buttons (editor only) */}
+        {/* Right side actions */}
         {showEditorActions && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             {wasDownscaled && (
-              <span className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-blue-700 bg-blue-50 rounded-full">
+              <span className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-blue-700 bg-blue-50 rounded-full mr-1">
                 <Info className="w-3.5 h-3.5" />
-                Image was resized for best performance
+                <span className="hidden md:inline">Image was resized for best performance</span>
               </span>
+            )}
+            {canUndo && (
+              <button
+                type="button"
+                onClick={undoCrop}
+                className={btnClass}
+                title={undoneState ? 'Redo Crop' : 'Undo Crop'}
+              >
+                {undoneState ? <Redo2 className="w-4 h-4" /> : <Undo2 className="w-4 h-4" />}
+              </button>
             )}
             <button
               type="button"
               onClick={handleNewImage}
-              className="flex items-center gap-1.5 px-2 md:px-3 py-1.5 text-sm text-[#6B6B6B] hover:text-[#2A9D8F] rounded-md transition-colors"
+              className={btnClass}
               title="New Image"
             >
               <ImagePlus className="w-4 h-4" />
@@ -67,7 +89,7 @@ export function TopBar({ showEditorActions = true }: TopBarProps) {
             <button
               type="button"
               onClick={resetAll}
-              className="flex items-center gap-1.5 px-2 md:px-3 py-1.5 text-sm text-[#6B6B6B] hover:text-[#2A9D8F] rounded-md transition-colors"
+              className={btnClass}
               title="Reset All"
             >
               <RefreshCw className="w-4 h-4" />
