@@ -2,7 +2,7 @@
 
 ## Overview
 
-WebImager delivers a browser-based image editor in three phases. Phase 1 establishes the non-destructive render pipeline, file I/O, basic transforms, and download -- the architectural skeleton that every subsequent feature plugs into. Phase 2 adds the adjustment panel (brightness, contrast, saturation, greyscale) on top of the proven pipeline. Phase 3 tackles the most complex UI interaction -- free-drag crop with Cropper.js and resize with dimension inputs -- after the core pipeline is stable and validated.
+WebImager delivers a browser-based image editor in three phases. Phase 1 establishes the non-destructive render pipeline, file I/O, basic transforms, and download -- the architectural skeleton that every subsequent feature plugs into. Phase 2 adds the adjustment panel (brightness, contrast, saturation, greyscale) on top of the proven pipeline. Phase 3 tackles the most complex UI interaction -- free-drag crop with a custom HTML overlay and resize with dimension inputs -- after the core pipeline is stable and validated.
 
 ## Phases
 
@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation** - Upload pipeline, canvas renderer, transforms, download, and live preview (completed 2026-03-14)
 - [x] **Phase 2: Adjustments** - Brightness, contrast, saturation, and greyscale controls (completed 2026-03-14)
-- [ ] **Phase 3: Crop & Resize** - Free-drag crop with Cropper.js and resize with aspect ratio lock
+- [ ] **Phase 3: Crop & Resize** - Free-drag crop with custom overlay and resize with aspect ratio lock
 
 ## Phase Details
 
@@ -59,10 +59,12 @@ Plans:
   2. User can lock crop to aspect ratio presets (16:9, 1:1, 4:3, etc.)
   3. User can enter width and height to resize the image with an aspect ratio lock toggle
   4. Crop and resize produce correct output at full source resolution (not display-scaled)
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 03-01: TBD
+- [ ] 03-01-PLAN.md — Crop/resize data layer: types, math utilities, store, render pipeline (TDD)
+- [ ] 03-02-PLAN.md — CropOverlay and CropToolbar UI, Canvas/Editor/Sidebar wiring
+- [ ] 03-03-PLAN.md — ResizeControls UI component and sidebar integration
 
 ## Progress
 
@@ -72,5 +74,5 @@ Phases execute in numeric order: 1 -> 2 -> 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete    | 2026-03-14 |
-| 2. Adjustments | 0/2 | Complete    | 2026-03-14 |
-| 3. Crop & Resize | 0/? | Not started | - |
+| 2. Adjustments | 2/2 | Complete    | 2026-03-14 |
+| 3. Crop & Resize | 0/3 | Not started | - |
