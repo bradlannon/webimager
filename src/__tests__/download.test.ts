@@ -5,12 +5,16 @@ import { defaultAdjustments } from '../types/editor';
 describe('downloadImage', () => {
   let mockCtx: Record<string, unknown>;
   let mockCanvas: Record<string, unknown>;
+  let mockWhiteCtx: Record<string, unknown>;
+  let mockWhiteCanvas: Record<string, unknown>;
   let mockLink: Record<string, unknown>;
   let blobCallback: ((blob: Blob | null) => void) | null;
   let mockRenderToCanvas: ReturnType<typeof vi.fn>;
+  let canvasCreateCount: number;
 
   beforeEach(() => {
     blobCallback = null;
+    canvasCreateCount = 0;
     mockCtx = {
       canvas: {},
       save: vi.fn(),
@@ -19,9 +23,27 @@ describe('downloadImage', () => {
       rotate: vi.fn(),
       scale: vi.fn(),
       drawImage: vi.fn(),
+      fillRect: vi.fn(),
+      fillStyle: '',
     };
     mockCanvas = {
       getContext: vi.fn(() => mockCtx),
+      toBlob: vi.fn((cb: (blob: Blob | null) => void) => {
+        blobCallback = cb;
+      }),
+      width: 0,
+      height: 0,
+    };
+    mockWhiteCtx = {
+      canvas: {},
+      save: vi.fn(),
+      restore: vi.fn(),
+      drawImage: vi.fn(),
+      fillRect: vi.fn(),
+      fillStyle: '',
+    };
+    mockWhiteCanvas = {
+      getContext: vi.fn(() => mockWhiteCtx),
       toBlob: vi.fn((cb: (blob: Blob | null) => void) => {
         blobCallback = cb;
       }),
@@ -36,7 +58,10 @@ describe('downloadImage', () => {
 
     vi.stubGlobal('document', {
       createElement: vi.fn((tag: string) => {
-        if (tag === 'canvas') return mockCanvas;
+        if (tag === 'canvas') {
+          canvasCreateCount++;
+          return canvasCreateCount === 1 ? mockCanvas : mockWhiteCanvas;
+        }
         if (tag === 'a') return mockLink;
         return {};
       }),
@@ -166,5 +191,70 @@ describe('downloadImage', () => {
     blobCallback!(blob);
 
     expect(mockLink.download).toBe('edited.jpg');
+  });
+
+  test('JPEG + backgroundMask: creates second canvas with white fill', async () => {
+    vi.resetModules();
+    mockRenderToCanvas = vi.fn();
+    vi.doMock('../utils/canvas', () => ({
+      renderToCanvas: mockRenderToCanvas,
+    }));
+    const { downloadImage } = await import('../utils/download');
+
+    const source = { width: 800, height: 600 } as ImageBitmap;
+    const transforms: Transforms = { rotation: 0, freeRotation: 0, flipH: false, flipV: false };
+    const fakeMask = { width: 800, height: 600, data: new Uint8ClampedArray(4) } as unknown as ImageData;
+
+    downloadImage(source, transforms, defaultAdjustments, 'image/jpeg', 0.85, 'photo.jpg', undefined, fakeMask);
+
+    // Should create two canvases: one for render, one for white fill
+    expect(canvasCreateCount).toBe(2);
+    // White canvas context should have white fillStyle and fillRect called
+    expect(mockWhiteCtx.fillStyle).toBe('#ffffff');
+    expect(mockWhiteCtx.fillRect).toHaveBeenCalled();
+    // White canvas context should draw the transparent canvas onto it
+    expect(mockWhiteCtx.drawImage).toHaveBeenCalledWith(mockCanvas, 0, 0);
+    // toBlob should be called on the white canvas, not the original
+    expect(mockWhiteCanvas.toBlob).toHaveBeenCalled();
+    expect(mockCanvas.toBlob).not.toHaveBeenCalled();
+  });
+
+  test('PNG + backgroundMask: no white fill, preserves transparency', async () => {
+    vi.resetModules();
+    mockRenderToCanvas = vi.fn();
+    vi.doMock('../utils/canvas', () => ({
+      renderToCanvas: mockRenderToCanvas,
+    }));
+    const { downloadImage } = await import('../utils/download');
+
+    const source = { width: 800, height: 600 } as ImageBitmap;
+    const transforms: Transforms = { rotation: 0, freeRotation: 0, flipH: false, flipV: false };
+    const fakeMask = { width: 800, height: 600, data: new Uint8ClampedArray(4) } as unknown as ImageData;
+
+    downloadImage(source, transforms, defaultAdjustments, 'image/png', 1, 'photo.png', undefined, fakeMask);
+
+    // Only one canvas created (no white fill canvas)
+    expect(canvasCreateCount).toBe(1);
+    // toBlob called on original canvas
+    expect(mockCanvas.toBlob).toHaveBeenCalled();
+  });
+
+  test('JPEG without backgroundMask: no white fill', async () => {
+    vi.resetModules();
+    mockRenderToCanvas = vi.fn();
+    vi.doMock('../utils/canvas', () => ({
+      renderToCanvas: mockRenderToCanvas,
+    }));
+    const { downloadImage } = await import('../utils/download');
+
+    const source = { width: 800, height: 600 } as ImageBitmap;
+    const transforms: Transforms = { rotation: 0, freeRotation: 0, flipH: false, flipV: false };
+
+    downloadImage(source, transforms, defaultAdjustments, 'image/jpeg', 0.85);
+
+    // Only one canvas created
+    expect(canvasCreateCount).toBe(1);
+    // toBlob called on original canvas
+    expect(mockCanvas.toBlob).toHaveBeenCalled();
   });
 });
