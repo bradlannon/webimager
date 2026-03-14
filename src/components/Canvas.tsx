@@ -37,18 +37,6 @@ export function Canvas() {
     let displayW = rot90 ? sourceImage.height : sourceImage.width;
     let displayH = rot90 ? sourceImage.width : sourceImage.height;
 
-    // Account for free rotation bounding box expansion
-    const freeRot = transforms.freeRotation || 0;
-    if (freeRot !== 0) {
-      const rad = (freeRot * Math.PI) / 180;
-      const cos = Math.abs(Math.cos(rad));
-      const sin = Math.abs(Math.sin(rad));
-      const newW = Math.ceil(displayW * cos + displayH * sin);
-      const newH = Math.ceil(displayW * sin + displayH * cos);
-      displayW = newW;
-      displayH = newH;
-    }
-
     // When crop is applied (not in crop mode), use cropped dimensions for fit-to-view
     if (!cropMode && cropRegion && !(cropRegion.x === 0 && cropRegion.y === 0 && cropRegion.width === 100 && cropRegion.height === 100)) {
       displayW = Math.round((cropRegion.width / 100) * displayW);
