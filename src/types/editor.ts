@@ -24,6 +24,8 @@ export interface EditorState {
   wasDownscaled: boolean;
   transforms: Transforms;
   adjustments: Adjustments;
+  backgroundRemoved: boolean;
+  backgroundMask: ImageData | null;
 }
 
 export const defaultTransforms: Transforms = {

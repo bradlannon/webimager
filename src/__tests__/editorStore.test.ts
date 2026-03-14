@@ -13,6 +13,8 @@ describe('editorStore', () => {
       adjustments: { ...defaultAdjustments },
       cropRegion: null,
       cropMode: false,
+      backgroundRemoved: false,
+      backgroundMask: null,
     })
   })
 
@@ -259,6 +261,57 @@ describe('editorStore', () => {
       useEditorStore.getState().resetAll()
       expect(useEditorStore.getState().cropRegion).toBeNull()
       expect(useEditorStore.getState().cropMode).toBe(false)
+    })
+  })
+
+  describe('background removal', () => {
+    const mockMask = { data: new Uint8ClampedArray(4), width: 1, height: 1 } as unknown as ImageData
+
+    test('initial state has backgroundRemoved=false and backgroundMask=null', () => {
+      const state = useEditorStore.getState()
+      expect(state.backgroundRemoved).toBe(false)
+      expect(state.backgroundMask).toBeNull()
+    })
+
+    test('setBackgroundMask sets backgroundMask and backgroundRemoved=true', () => {
+      useEditorStore.getState().setBackgroundMask(mockMask)
+      const state = useEditorStore.getState()
+      expect(state.backgroundMask).toBe(mockMask)
+      expect(state.backgroundRemoved).toBe(true)
+    })
+
+    test('clearBackgroundMask sets both to null/false', () => {
+      useEditorStore.setState({ backgroundMask: mockMask, backgroundRemoved: true })
+      useEditorStore.getState().clearBackgroundMask()
+      const state = useEditorStore.getState()
+      expect(state.backgroundMask).toBeNull()
+      expect(state.backgroundRemoved).toBe(false)
+    })
+
+    test('toggleBackground flips backgroundRemoved without changing backgroundMask', () => {
+      useEditorStore.setState({ backgroundMask: mockMask, backgroundRemoved: true })
+      useEditorStore.getState().toggleBackground()
+      const state = useEditorStore.getState()
+      expect(state.backgroundRemoved).toBe(false)
+      expect(state.backgroundMask).toBe(mockMask)
+    })
+
+    test('resetAll clears backgroundRemoved and backgroundMask', () => {
+      useEditorStore.setState({ backgroundMask: mockMask, backgroundRemoved: true })
+      useEditorStore.getState().resetAll()
+      const state = useEditorStore.getState()
+      expect(state.backgroundRemoved).toBe(false)
+      expect(state.backgroundMask).toBeNull()
+    })
+
+    test('setImage clears backgroundRemoved and backgroundMask', () => {
+      useEditorStore.setState({ backgroundMask: mockMask, backgroundRemoved: true })
+      const mockBitmap = { close: () => {}, width: 100, height: 200 } as unknown as ImageBitmap
+      const mockFile = new File([''], 'test.jpg', { type: 'image/jpeg' })
+      useEditorStore.getState().setImage(mockBitmap, mockFile, false)
+      const state = useEditorStore.getState()
+      expect(state.backgroundRemoved).toBe(false)
+      expect(state.backgroundMask).toBeNull()
     })
   })
 })

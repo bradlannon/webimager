@@ -20,6 +20,10 @@ interface EditorStore {
   cropMode: boolean;
   cropAspectRatio: number | null;
 
+  // Background removal state
+  backgroundRemoved: boolean;
+  backgroundMask: ImageData | null;
+
   // Actions
   setImage: (bitmap: ImageBitmap, file: File, wasDownscaled: boolean) => void;
   rotateLeft: () => void;
@@ -29,6 +33,11 @@ interface EditorStore {
   setAdjustment: (key: keyof Omit<Adjustments, 'greyscale'>, value: number) => void;
   toggleGreyscale: () => void;
   resetAll: () => void;
+
+  // Background removal actions
+  setBackgroundMask: (mask: ImageData) => void;
+  clearBackgroundMask: () => void;
+  toggleBackground: () => void;
 
   // Crop actions
   enterCropMode: () => void;
@@ -49,6 +58,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   cropRegion: null,
   cropMode: false,
   cropAspectRatio: null,
+  backgroundRemoved: false,
+  backgroundMask: null,
 
   setImage: (bitmap, file, wasDownscaled) => {
     const old = get().sourceImage;
@@ -62,6 +73,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       cropRegion: null,
       cropMode: false,
       cropAspectRatio: null,
+      backgroundRemoved: false,
+      backgroundMask: null,
     });
   },
 
@@ -111,7 +124,13 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     cropRegion: null,
     cropMode: false,
     cropAspectRatio: null,
+    backgroundRemoved: false,
+    backgroundMask: null,
   }),
+
+  setBackgroundMask: (mask) => set({ backgroundMask: mask, backgroundRemoved: true }),
+  clearBackgroundMask: () => set({ backgroundMask: null, backgroundRemoved: false }),
+  toggleBackground: () => set((s) => ({ backgroundRemoved: !s.backgroundRemoved })),
 
   enterCropMode: () =>
     set((s) => ({
