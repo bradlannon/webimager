@@ -102,6 +102,48 @@ export const CROP_PRESETS: CropPreset[] = [
 ];
 
 /**
+ * Transform crop coordinates when the image is flipped horizontally.
+ * Mirrors the crop's X position so it tracks the same region.
+ */
+export function flipCropH(crop: CropRegion): CropRegion {
+  return { ...crop, x: 100 - crop.x - crop.width };
+}
+
+/**
+ * Transform crop coordinates when the image is flipped vertically.
+ * Mirrors the crop's Y position so it tracks the same region.
+ */
+export function flipCropV(crop: CropRegion): CropRegion {
+  return { ...crop, y: 100 - crop.y - crop.height };
+}
+
+/**
+ * Transform crop coordinates when the image is rotated 90° clockwise.
+ * The crop rectangle rotates with the image so it tracks the same region.
+ */
+export function rotateCropCW(crop: CropRegion): CropRegion {
+  return {
+    x: 100 - crop.y - crop.height,
+    y: crop.x,
+    width: crop.height,
+    height: crop.width,
+  };
+}
+
+/**
+ * Transform crop coordinates when the image is rotated 90° counter-clockwise.
+ * The crop rectangle rotates with the image so it tracks the same region.
+ */
+export function rotateCropCCW(crop: CropRegion): CropRegion {
+  return {
+    x: crop.y,
+    y: 100 - crop.x - crop.width,
+    width: crop.height,
+    height: crop.width,
+  };
+}
+
+/**
  * Calculate resize dimensions with optional aspect lock and percentage mode.
  *
  * @param currentW - current image width in pixels

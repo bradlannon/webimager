@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { Transforms, Adjustments, CropRegion } from '../types/editor';
 import { defaultTransforms, defaultAdjustments, defaultCrop } from '../types/editor';
-import { clampCrop } from '../utils/crop';
+import { clampCrop, flipCropH, flipCropV, rotateCropCW, rotateCropCCW } from '../utils/crop';
 
 interface EditorStore {
   // Image state
@@ -71,6 +71,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         ...s.transforms,
         rotation: ((s.transforms.rotation - 90 + 360) % 360) as Transforms['rotation'],
       },
+      cropRegion: s.cropRegion ? clampCrop(rotateCropCCW(s.cropRegion)) : null,
     })),
 
   rotateRight: () =>
@@ -79,16 +80,19 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         ...s.transforms,
         rotation: ((s.transforms.rotation + 90) % 360) as Transforms['rotation'],
       },
+      cropRegion: s.cropRegion ? clampCrop(rotateCropCW(s.cropRegion)) : null,
     })),
 
   flipHorizontal: () =>
     set((s) => ({
       transforms: { ...s.transforms, flipH: !s.transforms.flipH },
+      cropRegion: s.cropRegion ? flipCropH(s.cropRegion) : null,
     })),
 
   flipVertical: () =>
     set((s) => ({
       transforms: { ...s.transforms, flipV: !s.transforms.flipV },
+      cropRegion: s.cropRegion ? flipCropV(s.cropRegion) : null,
     })),
 
   setAdjustment: (key, value) =>

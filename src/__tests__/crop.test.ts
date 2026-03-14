@@ -3,6 +3,10 @@ import {
   cropToPixels,
   clampCrop,
   constrainToAspectRatio,
+  flipCropH,
+  flipCropV,
+  rotateCropCW,
+  rotateCropCCW,
   CROP_PRESETS,
 } from '../utils/crop'
 
@@ -104,6 +108,68 @@ describe('constrainToAspectRatio', () => {
     const result = constrainToAspectRatio(50, 50, 1, 1000, 500)
     expect(result.height).toBeCloseTo(50, 1)
     expect(result.width).toBeCloseTo(25, 1)
+  })
+})
+
+describe('flipCropH', () => {
+  test('mirrors crop horizontally', () => {
+    // Crop on left 25% of image: x=0, width=25 → should become x=75
+    const result = flipCropH({ x: 0, y: 10, width: 25, height: 50 })
+    expect(result).toEqual({ x: 75, y: 10, width: 25, height: 50 })
+  })
+
+  test('centered crop stays centered', () => {
+    const result = flipCropH({ x: 25, y: 25, width: 50, height: 50 })
+    expect(result).toEqual({ x: 25, y: 25, width: 50, height: 50 })
+  })
+
+  test('full image crop stays full', () => {
+    const result = flipCropH({ x: 0, y: 0, width: 100, height: 100 })
+    expect(result).toEqual({ x: 0, y: 0, width: 100, height: 100 })
+  })
+})
+
+describe('flipCropV', () => {
+  test('mirrors crop vertically', () => {
+    // Crop on top 25%: y=0, height=25 → should become y=75
+    const result = flipCropV({ x: 10, y: 0, width: 50, height: 25 })
+    expect(result).toEqual({ x: 10, y: 75, width: 50, height: 25 })
+  })
+
+  test('centered crop stays centered', () => {
+    const result = flipCropV({ x: 25, y: 25, width: 50, height: 50 })
+    expect(result).toEqual({ x: 25, y: 25, width: 50, height: 50 })
+  })
+})
+
+describe('rotateCropCW', () => {
+  test('rotates crop 90° clockwise', () => {
+    // Top-left corner crop → should become top-right corner
+    const result = rotateCropCW({ x: 0, y: 0, width: 25, height: 50 })
+    expect(result).toEqual({ x: 50, y: 0, width: 50, height: 25 })
+  })
+
+  test('full image stays full', () => {
+    const result = rotateCropCW({ x: 0, y: 0, width: 100, height: 100 })
+    expect(result).toEqual({ x: 0, y: 0, width: 100, height: 100 })
+  })
+})
+
+describe('rotateCropCCW', () => {
+  test('rotates crop 90° counter-clockwise', () => {
+    // Top-left corner crop → should become bottom-left corner
+    const result = rotateCropCCW({ x: 0, y: 0, width: 25, height: 50 })
+    expect(result).toEqual({ x: 0, y: 75, width: 50, height: 25 })
+  })
+
+  test('CW then CCW returns to original', () => {
+    const original = { x: 10, y: 20, width: 30, height: 40 }
+    const rotated = rotateCropCW(original)
+    const back = rotateCropCCW(rotated)
+    expect(back.x).toBeCloseTo(original.x)
+    expect(back.y).toBeCloseTo(original.y)
+    expect(back.width).toBeCloseTo(original.width)
+    expect(back.height).toBeCloseTo(original.height)
   })
 })
 
