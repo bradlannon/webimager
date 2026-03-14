@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { TransformControls } from './TransformControls';
 import { AdjustmentControls } from './AdjustmentControls';
+import { ResizeControls } from './ResizeControls';
 import { DownloadPanel } from './DownloadPanel';
 import { PrivacyBadge } from './PrivacyBadge';
 
@@ -46,6 +47,9 @@ export function Sidebar() {
         </CollapsibleSection>
         <CollapsibleSection title="Adjustments">
           <AdjustmentControls />
+        </CollapsibleSection>
+        <CollapsibleSection title="Resize">
+          <ResizeControls />
         </CollapsibleSection>
         <CollapsibleSection title="Download">
           <DownloadPanel />
