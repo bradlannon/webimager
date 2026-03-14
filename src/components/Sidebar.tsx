@@ -1,5 +1,8 @@
 import { useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { TransformControls } from './TransformControls';
+import { DownloadPanel } from './DownloadPanel';
+import { PrivacyBadge } from './PrivacyBadge';
 
 interface CollapsibleSectionProps {
   title: string;
@@ -35,12 +38,16 @@ function CollapsibleSection({
 
 export function Sidebar() {
   return (
-    <aside className="order-last md:order-first w-full md:w-64 md:h-full bg-white dark:bg-neutral-800 border-t md:border-t-0 md:border-r border-neutral-200 dark:border-neutral-700 overflow-y-auto shrink-0">
-      <CollapsibleSection title="Transform">
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
-          Transform controls will appear here
-        </p>
-      </CollapsibleSection>
+    <aside className="order-last md:order-first w-full md:w-64 md:h-full bg-white dark:bg-neutral-800 border-t md:border-t-0 md:border-r border-neutral-200 dark:border-neutral-700 overflow-y-auto shrink-0 flex flex-col">
+      <div className="flex-1">
+        <CollapsibleSection title="Transform">
+          <TransformControls />
+        </CollapsibleSection>
+        <CollapsibleSection title="Download">
+          <DownloadPanel />
+        </CollapsibleSection>
+      </div>
+      <PrivacyBadge />
     </aside>
   );
 }
