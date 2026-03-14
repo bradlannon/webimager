@@ -1,6 +1,149 @@
-import { describe, test, expect } from 'vitest'
-import { buildFilterString } from '../utils/canvas'
+import { describe, test, expect, vi, beforeEach } from 'vitest'
+import { buildFilterString, renderToCanvas } from '../utils/canvas'
 import { defaultAdjustments } from '../types/editor'
+import type { Transforms } from '../types/editor'
+
+// BGREM-06: renderToCanvas replacement color — destination-over compositing
+describe('renderToCanvas replacement color', () => {
+  let ctx: CanvasRenderingContext2D;
+  let canvas: HTMLCanvasElement;
+  let source: ImageBitmap;
+  let transforms: Transforms;
+  let mockMask: ImageData;
+
+  beforeEach(() => {
+    // Build a minimal mock canvas context that tracks composite operations
+    const compositeHistory: string[] = [];
+    ctx = {
+      canvas: { width: 100, height: 100 },
+      save: vi.fn(),
+      restore: vi.fn(),
+      translate: vi.fn(),
+      rotate: vi.fn(),
+      scale: vi.fn(),
+      drawImage: vi.fn(),
+      putImageData: vi.fn(),
+      fillRect: vi.fn(),
+      get globalCompositeOperation() { return compositeHistory[compositeHistory.length - 1] ?? 'source-over'; },
+      set globalCompositeOperation(v: string) { compositeHistory.push(v); },
+      fillStyle: '',
+      filter: 'none',
+    } as unknown as CanvasRenderingContext2D;
+
+    canvas = {
+      width: 0,
+      height: 0,
+      getContext: vi.fn(() => ctx),
+    } as unknown as HTMLCanvasElement;
+
+    // Stub document.createElement so offscreen canvases return a minimal mock
+    vi.stubGlobal('document', {
+      createElement: vi.fn(() => ({
+        width: 0,
+        height: 0,
+        getContext: vi.fn(() => ({
+          save: vi.fn(),
+          restore: vi.fn(),
+          translate: vi.fn(),
+          rotate: vi.fn(),
+          scale: vi.fn(),
+          drawImage: vi.fn(),
+          putImageData: vi.fn(),
+          fillRect: vi.fn(),
+          globalCompositeOperation: 'source-over',
+          fillStyle: '',
+          filter: 'none',
+        })),
+      })),
+    });
+
+    source = { width: 100, height: 100, close: vi.fn() } as unknown as ImageBitmap;
+    transforms = { rotation: 0, freeRotation: 0, flipH: false, flipV: false };
+    mockMask = { width: 100, height: 100, data: new Uint8ClampedArray(100 * 100 * 4) } as unknown as ImageData;
+
+    // Point ctx.canvas to a writable proxy
+    Object.defineProperty(ctx, 'canvas', {
+      value: { width: 100, height: 100 },
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  test('destination_over_composite_used_with_fillRect_when_replacementColor_and_mask_provided', () => {
+    const compositeOps: string[] = [];
+    const fillRectCalls: unknown[] = [];
+    const fillStyles: string[] = [];
+
+    // Rebuild ctx with tracking
+    const trackedCtx = {
+      canvas: { width: 100, height: 100 },
+      save: vi.fn(),
+      restore: vi.fn(),
+      translate: vi.fn(),
+      rotate: vi.fn(),
+      scale: vi.fn(),
+      drawImage: vi.fn(),
+      putImageData: vi.fn(),
+      filter: 'none',
+      get fillStyle() { return fillStyles[fillStyles.length - 1] ?? ''; },
+      set fillStyle(v: string) { fillStyles.push(v); },
+      fillRect: vi.fn((...args) => { fillRectCalls.push(args); }),
+      get globalCompositeOperation() { return compositeOps[compositeOps.length - 1] ?? 'source-over'; },
+      set globalCompositeOperation(v: string) { compositeOps.push(v); },
+    } as unknown as CanvasRenderingContext2D;
+
+    Object.defineProperty(trackedCtx, 'canvas', {
+      value: { width: 100, height: 100 },
+      writable: true,
+      configurable: true,
+    });
+
+    renderToCanvas(trackedCtx, source, transforms, defaultAdjustments, undefined, mockMask, '#ff0000');
+
+    // destination-over must appear in composite ops (to paint color behind subject)
+    expect(compositeOps).toContain('destination-over');
+
+    // fillRect must have been called at least once
+    expect(fillRectCalls.length).toBeGreaterThan(0);
+
+    // fillStyle must have been set to the replacement color
+    expect(fillStyles).toContain('#ff0000');
+
+    // After replacement color block, composite should be reset to source-over
+    expect(compositeOps[compositeOps.length - 1]).toBe('source-over');
+  });
+
+  test('no_destination_over_composite_when_no_replacementColor', () => {
+    const compositeOps: string[] = [];
+
+    const trackedCtx = {
+      canvas: { width: 100, height: 100 },
+      save: vi.fn(),
+      restore: vi.fn(),
+      translate: vi.fn(),
+      rotate: vi.fn(),
+      scale: vi.fn(),
+      drawImage: vi.fn(),
+      putImageData: vi.fn(),
+      filter: 'none',
+      fillStyle: '',
+      fillRect: vi.fn(),
+      get globalCompositeOperation() { return compositeOps[compositeOps.length - 1] ?? 'source-over'; },
+      set globalCompositeOperation(v: string) { compositeOps.push(v); },
+    } as unknown as CanvasRenderingContext2D;
+
+    Object.defineProperty(trackedCtx, 'canvas', {
+      value: { width: 100, height: 100 },
+      writable: true,
+      configurable: true,
+    });
+
+    renderToCanvas(trackedCtx, source, transforms, defaultAdjustments, undefined, mockMask, null);
+
+    // destination-over must NOT appear when no replacementColor
+    expect(compositeOps).not.toContain('destination-over');
+  });
+});
 
 describe('buildFilterString', () => {
   test('returns "none" for default adjustments', () => {
