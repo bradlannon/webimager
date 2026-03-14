@@ -5,6 +5,7 @@ import { renderToCanvas, drawCheckerboard } from '../utils/canvas';
 export function useRenderPipeline(canvasRef: RefObject<HTMLCanvasElement | null>) {
   const sourceImage = useEditorStore((s) => s.sourceImage);
   const transforms = useEditorStore((s) => s.transforms);
+  const adjustments = useEditorStore((s) => s.adjustments);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -13,10 +14,10 @@ export function useRenderPipeline(canvasRef: RefObject<HTMLCanvasElement | null>
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Render the image with transforms applied
-    renderToCanvas(ctx, sourceImage, transforms);
+    // Render the image with transforms and adjustments applied
+    renderToCanvas(ctx, sourceImage, transforms, adjustments);
 
     // Draw checkerboard behind image on a separate pass
     // (The checkerboard is drawn underneath via CSS or a background canvas)
-  }, [canvasRef, sourceImage, transforms]);
+  }, [canvasRef, sourceImage, transforms, adjustments]);
 }

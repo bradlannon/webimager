@@ -1,13 +1,14 @@
-import type { Transforms } from '../types/editor';
+import type { Transforms, Adjustments } from '../types/editor';
 import { renderToCanvas } from './canvas';
 
 /**
- * Download the current image with transforms applied.
+ * Download the current image with transforms and adjustments applied.
  * Uses toBlob (not toDataURL) for memory efficiency.
  */
 export function downloadImage(
   source: ImageBitmap,
   transforms: Transforms,
+  adjustments: Adjustments,
   format: 'image/jpeg' | 'image/png',
   quality: number,
   filename?: string
@@ -16,7 +17,7 @@ export function downloadImage(
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  renderToCanvas(ctx, source, transforms);
+  renderToCanvas(ctx, source, transforms, adjustments);
 
   const ext = format === 'image/jpeg' ? '.jpg' : '.png';
   const qualityParam = format === 'image/jpeg' ? quality : undefined;

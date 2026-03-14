@@ -1,5 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import type { Transforms } from '../types/editor';
+import { defaultAdjustments } from '../types/editor';
 
 describe('downloadImage', () => {
   let mockCtx: Record<string, unknown>;
@@ -58,11 +59,11 @@ describe('downloadImage', () => {
     const source = { width: 800, height: 600 } as ImageBitmap;
     const transforms: Transforms = { rotation: 0, flipH: false, flipV: false };
 
-    downloadImage(source, transforms, 'image/jpeg', 0.85);
+    downloadImage(source, transforms, defaultAdjustments, 'image/jpeg', 0.85);
 
     expect(document.createElement).toHaveBeenCalledWith('canvas');
     expect(mockCanvas.getContext).toHaveBeenCalledWith('2d');
-    expect(mockRenderToCanvas).toHaveBeenCalledWith(mockCtx, source, transforms);
+    expect(mockRenderToCanvas).toHaveBeenCalledWith(mockCtx, source, transforms, defaultAdjustments);
   });
 
   test('calls toBlob with image/jpeg and quality for JPEG format', async () => {
@@ -76,7 +77,7 @@ describe('downloadImage', () => {
     const source = { width: 800, height: 600 } as ImageBitmap;
     const transforms: Transforms = { rotation: 0, flipH: false, flipV: false };
 
-    downloadImage(source, transforms, 'image/jpeg', 0.75);
+    downloadImage(source, transforms, defaultAdjustments, 'image/jpeg', 0.75);
 
     expect(mockCanvas.toBlob).toHaveBeenCalledWith(
       expect.any(Function),
@@ -96,7 +97,7 @@ describe('downloadImage', () => {
     const source = { width: 800, height: 600 } as ImageBitmap;
     const transforms: Transforms = { rotation: 0, flipH: false, flipV: false };
 
-    downloadImage(source, transforms, 'image/png', 0.85);
+    downloadImage(source, transforms, defaultAdjustments, 'image/png', 0.85);
 
     expect(mockCanvas.toBlob).toHaveBeenCalledWith(
       expect.any(Function),
@@ -116,7 +117,7 @@ describe('downloadImage', () => {
     const source = { width: 800, height: 600 } as ImageBitmap;
     const transforms: Transforms = { rotation: 0, flipH: false, flipV: false };
 
-    downloadImage(source, transforms, 'image/jpeg', 0.85, 'photo.jpg');
+    downloadImage(source, transforms, defaultAdjustments, 'image/jpeg', 0.85, 'photo.jpg');
 
     // Simulate toBlob callback
     const blob = new Blob(['fake'], { type: 'image/jpeg' });
@@ -140,7 +141,7 @@ describe('downloadImage', () => {
     const source = { width: 800, height: 600 } as ImageBitmap;
     const transforms: Transforms = { rotation: 0, flipH: false, flipV: false };
 
-    downloadImage(source, transforms, 'image/png', 1, 'photo.png');
+    downloadImage(source, transforms, defaultAdjustments, 'image/png', 1, 'photo.png');
 
     const blob = new Blob(['fake'], { type: 'image/png' });
     blobCallback!(blob);
@@ -159,7 +160,7 @@ describe('downloadImage', () => {
     const source = { width: 800, height: 600 } as ImageBitmap;
     const transforms: Transforms = { rotation: 0, flipH: false, flipV: false };
 
-    downloadImage(source, transforms, 'image/jpeg', 0.85);
+    downloadImage(source, transforms, defaultAdjustments, 'image/jpeg', 0.85);
 
     const blob = new Blob(['fake'], { type: 'image/jpeg' });
     blobCallback!(blob);

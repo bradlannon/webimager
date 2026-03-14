@@ -1,4 +1,4 @@
-import type { Transforms } from '../types/editor';
+import type { Transforms, Adjustments } from '../types/editor';
 
 export const MAX_CANVAS_PIXELS = 16_777_216;
 
@@ -20,10 +20,20 @@ export function limitSize(
   };
 }
 
+export function buildFilterString(adjustments: Adjustments): string {
+  const parts: string[] = [];
+  if (adjustments.brightness !== 100) parts.push(`brightness(${adjustments.brightness}%)`);
+  if (adjustments.contrast !== 100) parts.push(`contrast(${adjustments.contrast}%)`);
+  if (adjustments.saturation !== 100) parts.push(`saturate(${adjustments.saturation}%)`);
+  if (adjustments.greyscale) parts.push('grayscale(100%)');
+  return parts.length > 0 ? parts.join(' ') : 'none';
+}
+
 export function renderToCanvas(
   ctx: CanvasRenderingContext2D,
   source: ImageBitmap,
-  transforms: Transforms
+  transforms: Transforms,
+  adjustments?: Adjustments
 ): void {
   const { rotation, flipH, flipV } = transforms;
   const isRotated90 = rotation === 90 || rotation === 270;
@@ -36,6 +46,9 @@ export function renderToCanvas(
   ctx.translate(drawW / 2, drawH / 2);
   ctx.rotate((rotation * Math.PI) / 180);
   ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+  if (adjustments) {
+    ctx.filter = buildFilterString(adjustments);
+  }
   ctx.drawImage(source, -source.width / 2, -source.height / 2);
   ctx.restore();
 }
