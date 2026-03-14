@@ -73,10 +73,27 @@ Plans:
 - [x] 06-01-PLAN.md — Add fonts, glassmorphism CSS, create TopBar + BottomBar + OverlayPanel components
 - [x] 06-02-PLAN.md — Rewire Editor layout, populate panels with controls, restyle sliders, visual checkpoint
 
+### Phase 7: Pan and Zoom - Move tool with hand cursor for panning the image and pinch/scroll zoom for magnification
+**Goal:** Users can zoom into images with scroll wheel/pinch (cursor-centered, 25%-300%) and drag to pan when zoomed in, with floating glassmorphism zoom controls and proper crop mode coexistence
+**Depends on:** Phase 6
+**Requirements**: PZ-01, PZ-02, PZ-03, PZ-04, PZ-05, PZ-06, PZ-07, PZ-08
+**Success Criteria** (what must be TRUE):
+  1. Scroll wheel zooms in/out centered on cursor position within 25%-300% range
+  2. Drag pans the image when zoomed past fit-to-view, disabled at fit-to-view
+  3. Cursor shows grab/grabbing when zoomed in, default at fit-to-view
+  4. Floating zoom controls (+/-, percentage) visible with glassmorphism styling
+  5. Double-click resets to fit-to-view
+  6. Crop mode coexists with zoom/pan (handle drags crop, elsewhere pans)
+**Plans**: 2 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — Zoom math utilities, store extension, Canvas zoom/pan engine with events and cursors
+- [ ] 07-02-PLAN.md — ZoomControls floating UI widget, visual checkpoint
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 4 → 5 → 6
+Phases execute in numeric order: 4 → 5 → 6 → 7
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -86,3 +103,4 @@ Phases execute in numeric order: 4 → 5 → 6
 | 4. Background Removal Engine | 2/3 | In Progress|  | - |
 | 5. Export and Background Replacement | v2.0 | 1/2 | In Progress | - |
 | 6. Sidebar Redesign | 2/2 | Complete   | 2026-03-14 | 2026-03-14 |
+| 7. Pan and Zoom | - | 0/2 | Planned | - |
