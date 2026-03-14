@@ -100,10 +100,10 @@ Plans:
   2. Applying resize after background removal clears background state cleanly (no stale mask compositing)
   3. BGREM-04 checkerboard requirement verified as satisfied via CSS implementation
   4. No dead imports related to background removal in the codebase
-**Plans**: 0 plans
+**Plans**: 1 plan
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 8 to break down)
+- [ ] 08-01-PLAN.md — Fix restoreBackground toggle bug, applyResize background state, dead import cleanup
 
 ## Progress
 
@@ -119,4 +119,4 @@ Phases execute in numeric order: 4 → 5 → 6 → 7 → 8
 | 5. Export and Background Replacement | v2.0 | 1/2 | In Progress | - |
 | 6. Sidebar Redesign | 2/2 | Complete   | 2026-03-14 | 2026-03-14 |
 | 7. Pan and Zoom | 2/2 | Complete   | 2026-03-14 | - |
-| 8. BG Removal Bug Fixes | 0/0 | Pending | - | - |
+| 8. BG Removal Bug Fixes | 0/1 | Pending | - | - |
