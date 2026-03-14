@@ -9,9 +9,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### File I/O
 
-- [ ] **FILE-01**: User can upload an image via drag-and-drop or file picker (JPEG, PNG, WebP)
-- [ ] **FILE-02**: Images exceeding safe canvas pixel limits are auto-downscaled on upload with notification
-- [ ] **FILE-03**: EXIF orientation is auto-corrected on upload so photos display correctly
+- [x] **FILE-01**: User can upload an image via drag-and-drop or file picker (JPEG, PNG, WebP)
+- [x] **FILE-02**: Images exceeding safe canvas pixel limits are auto-downscaled on upload with notification
+- [x] **FILE-03**: EXIF orientation is auto-corrected on upload so photos display correctly
 - [ ] **FILE-04**: User can download processed image as JPEG or PNG with quality slider
 
 ### Transforms
@@ -65,9 +65,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FILE-01 | Phase 1 | Pending |
-| FILE-02 | Phase 1 | Pending |
-| FILE-03 | Phase 1 | Pending |
+| FILE-01 | Phase 1 | Complete |
+| FILE-02 | Phase 1 | Complete |
+| FILE-03 | Phase 1 | Complete |
 | FILE-04 | Phase 1 | Pending |
 | TRAN-01 | Phase 3 | Pending |
 | TRAN-02 | Phase 1 | Complete |
