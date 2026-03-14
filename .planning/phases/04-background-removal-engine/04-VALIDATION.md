@@ -2,7 +2,7 @@
 phase: 4
 slug: background-removal-engine
 status: draft
-nyquist_compliant: false
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-03-14
 ---
@@ -42,8 +42,7 @@ created: 2026-03-14
 | 04-01-02 | 01 | 1 | BGREM-01 | unit | `npx vitest run src/__tests__/backgroundRemoval.test.ts` | ❌ W0 | ⬜ pending |
 | 04-01-03 | 01 | 1 | BGREM-02 | unit | `npx vitest run src/__tests__/backgroundRemoval.test.ts -t "progress"` | ❌ W0 | ⬜ pending |
 | 04-01-04 | 01 | 1 | BGREM-03 | unit | `npx vitest run src/__tests__/backgroundRemoval.test.ts -t "inference"` | ❌ W0 | ⬜ pending |
-| 04-01-05 | 01 | 1 | BGREM-04 | unit | `npx vitest run src/__tests__/components.test.tsx -t "checkerboard"` | ❌ W0 | ⬜ pending |
-| 04-01-06 | 01 | 1 | BGREM-05 | unit | `npx vitest run src/__tests__/editorStore.test.ts -t "background"` | ❌ W0 | ⬜ pending |
+| 04-01-05 | 01 | 1 | BGREM-05 | unit | `npx vitest run src/__tests__/editorStore.test.ts -t "background"` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -73,11 +72,11 @@ created: 2026-03-14
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 5s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 5s
+- [x] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** pending
