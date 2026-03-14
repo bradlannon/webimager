@@ -10,8 +10,8 @@ Requirements for v2.0 milestone. Each maps to roadmap phases.
 ### Background Removal
 
 - [x] **BGREM-01**: User can remove image background with one click using in-browser AI model
-- [ ] **BGREM-02**: User sees a progress bar during model download on first use (~45MB)
-- [ ] **BGREM-03**: User sees a progress/loading indicator during background removal inference
+- [x] **BGREM-02**: User sees a progress bar during model download on first use (~45MB)
+- [x] **BGREM-03**: User sees a progress/loading indicator during background removal inference
 - [ ] **BGREM-04**: Transparent areas display on checkerboard background
 - [x] **BGREM-05**: User can restore the original background with one click
 - [ ] **BGREM-06**: User can replace transparent background with a solid color (white, black, or custom picker)
@@ -53,8 +53,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | BGREM-01 | Phase 4 | Complete |
-| BGREM-02 | Phase 4 | Pending |
-| BGREM-03 | Phase 4 | Pending |
+| BGREM-02 | Phase 4 | Complete |
+| BGREM-03 | Phase 4 | Complete |
 | BGREM-04 | Phase 4 | Pending |
 | BGREM-05 | Phase 4 | Complete |
 | BGREM-06 | Phase 5 | Pending |
