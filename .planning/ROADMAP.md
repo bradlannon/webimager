@@ -28,11 +28,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Photos taken on phones display in correct orientation (EXIF correction applied)
   4. User can rotate 90 degrees left/right and flip horizontal/vertical with instant preview
   5. User can download the processed image as JPEG or PNG with quality selection
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md — Scaffold project, types, store, render pipeline, and test infrastructure
+- [ ] 01-02-PLAN.md — Upload flow (DropZone + image loader) and editor layout (Canvas + Sidebar)
+- [ ] 01-03-PLAN.md — Transform controls, download panel, privacy badge, and visual verification
 
 ### Phase 2: Adjustments
 **Goal**: Users can fine-tune their photo with brightness, contrast, saturation sliders and one-click greyscale -- all with real-time preview
@@ -69,6 +70,6 @@ Phases execute in numeric order: 1 -> 2 -> 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/? | Not started | - |
+| 1. Foundation | 0/3 | Not started | - |
 | 2. Adjustments | 0/? | Not started | - |
 | 3. Crop & Resize | 0/? | Not started | - |
