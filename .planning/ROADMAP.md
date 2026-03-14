@@ -44,10 +44,11 @@ Plans:
   2. User can drag contrast and saturation sliders with immediate visual feedback
   3. User can convert image to greyscale with one click and see instant result
   4. All adjustments compose correctly -- user can combine brightness + contrast + saturation and the result reflects all three
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 02-01: TBD
+- [ ] 02-01-PLAN.md — Adjustment data layer: types, store, render pipeline, unit tests
+- [ ] 02-02-PLAN.md — AdjustmentControls UI component, sidebar wiring, visual verification
 
 ### Phase 3: Crop & Resize
 **Goal**: Users can crop their image with a free-drag selection and resize it by entering dimensions -- completing the full editing workflow
@@ -71,5 +72,5 @@ Phases execute in numeric order: 1 -> 2 -> 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete    | 2026-03-14 |
-| 2. Adjustments | 0/? | Not started | - |
+| 2. Adjustments | 0/2 | Not started | - |
 | 3. Crop & Resize | 0/? | Not started | - |
