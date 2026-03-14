@@ -56,10 +56,26 @@ Plans:
 Plans:
 - [ ] 05-01: TBD
 
+### Phase 6: Sidebar Redesign - Move sidebar to bottom bar with professional UI design
+**Goal:** Replace sidebar with bottom icon tab bar and slide-up overlay panels, redesign editor chrome with glassmorphism styling, top bar matching bradlannon.ca navigation
+**Depends on:** Phase 5
+**Requirements**: UI-TOPBAR, UI-BOTTOMBAR, UI-GLASSMORPHISM, UI-PANELS, UI-LAYOUT-REWIRE, UI-PANEL-CONTENT, UI-SLIDER-RESTYLE, UI-CROP-PANEL, UI-RESPONSIVE, UI-VISUAL-VERIFY
+**Success Criteria** (what must be TRUE):
+  1. Sidebar is completely removed, replaced by a bottom icon tab bar with 6 tabs
+  2. Each tab opens a slide-up overlay panel with glassmorphism styling containing that group's controls
+  3. Top bar matches bradlannon.ca navigation style with Portfolio, Apps, A/V links
+  4. Sliders have premium styling with custom thumb and accent color
+  5. Layout is responsive: centered panels on desktop, full-width on mobile
+**Plans**: 2 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — Add fonts, glassmorphism CSS, create TopBar + BottomBar + OverlayPanel components
+- [ ] 06-02-PLAN.md — Rewire Editor layout, populate panels with controls, restyle sliders, visual checkpoint
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 4 → 5
+Phases execute in numeric order: 4 → 5 → 6
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -68,3 +84,4 @@ Phases execute in numeric order: 4 → 5
 | 3. Crop & Resize | v1.0 | 3/3 | Complete | 2026-03-14 |
 | 4. Background Removal Engine | 2/3 | In Progress|  | - |
 | 5. Export and Background Replacement | v2.0 | 0/? | Not started | - |
+| 6. Sidebar Redesign | v2.0 | 0/2 | Not started | - |
