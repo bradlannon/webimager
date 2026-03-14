@@ -48,8 +48,8 @@ export function useBackgroundRemoval() {
 
       switch (msg.type) {
         case 'download-progress':
-          // progress_callback sends 0-100, normalize to 0-1
-          setDownloadProgress((msg.progress ?? 0) / 100);
+          // progress_callback sends 0-100
+          setDownloadProgress(Math.min(msg.progress ?? 0, 100));
           break;
 
         case 'model-ready':

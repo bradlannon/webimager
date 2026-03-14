@@ -80,13 +80,13 @@ export function BackgroundControls() {
               Downloading model...
             </span>
             <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
-              {Math.round(downloadProgress * 100)}%
+              {Math.round(downloadProgress)}%
             </span>
           </div>
           <div className="h-2 bg-neutral-200 dark:bg-neutral-600 rounded-full overflow-hidden">
             <div
               className="h-2 bg-blue-500 rounded-full transition-all duration-300"
-              style={{ width: `${Math.round(downloadProgress * 100)}%` }}
+              style={{ width: `${Math.round(downloadProgress)}%` }}
             />
           </div>
           <button
