@@ -37,12 +37,19 @@ export function useBackgroundRemoval() {
       { type: 'module' }
     );
 
+    worker.onerror = (e: ErrorEvent) => {
+      e.preventDefault();
+      setStatus('error');
+      setError(e.message || 'Background removal worker failed to load');
+    };
+
     worker.onmessage = (e: MessageEvent) => {
       const msg = e.data;
 
       switch (msg.type) {
         case 'download-progress':
-          setDownloadProgress(msg.progress);
+          // progress_callback sends 0-100, normalize to 0-1
+          setDownloadProgress((msg.progress ?? 0) / 100);
           break;
 
         case 'model-ready':
@@ -110,8 +117,13 @@ export function useBackgroundRemoval() {
     setDownloadProgress(0);
     setStatus('downloading');
 
-    const worker = workerRef.current ?? createWorker();
-    worker.postMessage({ type: 'load-model' });
+    try {
+      const worker = workerRef.current ?? createWorker();
+      worker.postMessage({ type: 'load-model' });
+    } catch (err) {
+      setStatus('error');
+      setError(err instanceof Error ? err.message : 'Failed to start background removal');
+    }
   }, [createWorker]);
 
   const cancel = useCallback(() => {
