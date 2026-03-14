@@ -14,7 +14,7 @@ export function Editor() {
       <div style={{ height: '64px' }} className="shrink-0" />
       {cropMode && <CropToolbar />}
       {/* Canvas area fills between top bar and fixed bottom bar */}
-      <div className="relative flex-1 overflow-hidden" style={{ marginBottom: '48px' }}>
+      <div className="flex flex-col flex-1 overflow-hidden" style={{ marginBottom: '48px' }}>
         <Canvas />
       </div>
       <BottomBar />
