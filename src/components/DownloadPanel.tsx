@@ -3,7 +3,7 @@ import { useEditorStore } from '../store/editorStore';
 import { downloadImage } from '../utils/download';
 
 export function DownloadPanel() {
-  const { sourceImage, transforms, adjustments, originalFile, cropRegion, backgroundRemoved, backgroundMask } = useEditorStore();
+  const { sourceImage, transforms, adjustments, originalFile, cropRegion, backgroundRemoved, backgroundMask, replacementColor } = useEditorStore();
 
   const handleDownload = (format: 'image/jpeg' | 'image/png') => {
     if (!sourceImage) return;
@@ -15,7 +15,7 @@ export function DownloadPanel() {
     const filename = `${stem}${ext}`;
 
     const quality = format === 'image/jpeg' ? 0.85 : 1;
-    downloadImage(sourceImage, transforms, adjustments, format, quality, filename, cropRegion ?? undefined, backgroundRemoved ? backgroundMask : undefined);
+    downloadImage(sourceImage, transforms, adjustments, format, quality, filename, cropRegion ?? undefined, backgroundRemoved ? backgroundMask : undefined, backgroundRemoved ? replacementColor : undefined);
   };
 
   const primaryClass = "flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-[#2A9D8F] text-white rounded-lg hover:bg-[#238578] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium";
