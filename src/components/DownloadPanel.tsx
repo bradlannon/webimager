@@ -1,16 +1,11 @@
-import { useState } from 'react';
 import { Download } from 'lucide-react';
 import { useEditorStore } from '../store/editorStore';
 import { downloadImage } from '../utils/download';
 
-type Format = 'image/jpeg' | 'image/png';
-
 export function DownloadPanel() {
   const { sourceImage, transforms, adjustments, originalFile, cropRegion, backgroundRemoved, backgroundMask } = useEditorStore();
-  const [format, setFormat] = useState<Format>('image/jpeg');
-  const [quality, setQuality] = useState(85);
 
-  const handleDownload = () => {
+  const handleDownload = (format: 'image/jpeg' | 'image/png') => {
     if (!sourceImage) return;
 
     const ext = format === 'image/jpeg' ? '.jpg' : '.png';
@@ -19,61 +14,29 @@ export function DownloadPanel() {
       : 'edited';
     const filename = `${stem}${ext}`;
 
-    downloadImage(sourceImage, transforms, adjustments, format, quality / 100, filename, cropRegion ?? undefined, backgroundRemoved ? backgroundMask : undefined);
+    const quality = format === 'image/jpeg' ? 0.85 : 1;
+    downloadImage(sourceImage, transforms, adjustments, format, quality, filename, cropRegion ?? undefined, backgroundRemoved ? backgroundMask : undefined);
   };
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-2">
-        <label className="flex items-center gap-1.5 text-sm text-neutral-700 dark:text-neutral-300 cursor-pointer">
-          <input
-            type="radio"
-            name="format"
-            value="image/jpeg"
-            checked={format === 'image/jpeg'}
-            onChange={() => setFormat('image/jpeg')}
-            className="accent-blue-600"
-          />
-          JPEG
-        </label>
-        <label className="flex items-center gap-1.5 text-sm text-neutral-700 dark:text-neutral-300 cursor-pointer">
-          <input
-            type="radio"
-            name="format"
-            value="image/png"
-            checked={format === 'image/png'}
-            onChange={() => setFormat('image/png')}
-            className="accent-blue-600"
-          />
-          PNG
-        </label>
-      </div>
-
-      {format === 'image/jpeg' && (
-        <div className="space-y-1">
-          <label className="flex items-center justify-between text-sm text-neutral-600 dark:text-neutral-400">
-            <span>Quality</span>
-            <span>{quality}%</span>
-          </label>
-          <input
-            type="range"
-            min={1}
-            max={100}
-            value={quality}
-            onChange={(e) => setQuality(Number(e.target.value))}
-            className="w-full"
-          />
-        </div>
-      )}
-
       <button
         type="button"
         disabled={!sourceImage}
-        onClick={handleDownload}
-        className="flex items-center justify-center gap-2 w-full px-4 py-2 bg-[#2A9D8F] text-white rounded-lg hover:bg-[#238578] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+        onClick={() => handleDownload('image/jpeg')}
+        className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-[#2A9D8F] text-white rounded-lg hover:bg-[#238578] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
       >
         <Download className="w-4 h-4" />
-        Download
+        Download JPEG
+      </button>
+      <button
+        type="button"
+        disabled={!sourceImage}
+        onClick={() => handleDownload('image/png')}
+        className="flex items-center justify-center gap-2 w-full px-4 py-2.5 border-2 border-[#2A9D8F] text-[#2A9D8F] dark:text-[#8ED8CE] rounded-lg hover:bg-[#2A9D8F]/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+      >
+        <Download className="w-4 h-4" />
+        Download PNG
       </button>
     </div>
   );

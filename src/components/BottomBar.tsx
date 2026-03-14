@@ -25,29 +25,10 @@ const tabs: Tab[] = [
   { id: 'download', label: 'Download', icon: Download },
 ];
 
-function CropPanel() {
-  const cropMode = useEditorStore((s) => s.cropMode);
-  const enterCropMode = useEditorStore((s) => s.enterCropMode);
-
-  return (
-    <div className="space-y-3">
-      <button
-        type="button"
-        onClick={enterCropMode}
-        disabled={cropMode}
-        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-neutral-700 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        <Crop className="w-4 h-4" />
-        {cropMode ? 'Crop mode active' : 'Start Crop'}
-      </button>
-    </div>
-  );
-}
-
 function PanelContent({ tabId }: { tabId: TabId }) {
   switch (tabId) {
     case 'crop':
-      return <CropPanel />;
+      return null;
     case 'transform':
       return <TransformControls />;
     case 'adjustments':
@@ -72,7 +53,15 @@ export function BottomBar() {
     }
   }, [cropMode]);
 
+  const enterCropMode = useEditorStore((s) => s.enterCropMode);
+
   const handleTabClick = (tabId: TabId) => {
+    if (tabId === 'crop') {
+      // Crop tab directly enters crop mode instead of opening a panel
+      if (!cropMode) enterCropMode();
+      setActiveTab(null);
+      return;
+    }
     setActiveTab((current) => (current === tabId ? null : tabId));
   };
 
