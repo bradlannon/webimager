@@ -12,7 +12,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **FILE-01**: User can upload an image via drag-and-drop or file picker (JPEG, PNG, WebP)
 - [x] **FILE-02**: Images exceeding safe canvas pixel limits are auto-downscaled on upload with notification
 - [x] **FILE-03**: EXIF orientation is auto-corrected on upload so photos display correctly
-- [ ] **FILE-04**: User can download processed image as JPEG or PNG with quality slider
+- [x] **FILE-04**: User can download processed image as JPEG or PNG with quality slider
 
 ### Transforms
 
@@ -35,7 +35,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### UX
 
 - [x] **UX-01**: All effects render as live preview in real-time
-- [ ] **UX-02**: Privacy indicator shows users their photo never leaves the browser
+- [x] **UX-02**: Privacy indicator shows users their photo never leaves the browser
 
 ## v2 Requirements
 
@@ -68,7 +68,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FILE-01 | Phase 1 | Complete |
 | FILE-02 | Phase 1 | Complete |
 | FILE-03 | Phase 1 | Complete |
-| FILE-04 | Phase 1 | Pending |
+| FILE-04 | Phase 1 | Complete |
 | TRAN-01 | Phase 3 | Pending |
 | TRAN-02 | Phase 1 | Complete |
 | TRAN-03 | Phase 1 | Complete |
@@ -79,7 +79,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ADJT-03 | Phase 2 | Pending |
 | ADJT-04 | Phase 2 | Pending |
 | UX-01 | Phase 1 | Complete |
-| UX-02 | Phase 1 | Pending |
+| UX-02 | Phase 1 | Complete |
 
 **Coverage:**
 - v1 requirements: 15 total
