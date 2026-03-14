@@ -24,14 +24,14 @@ Requirements for v2.0 milestone. Each maps to roadmap phases.
 
 ### Pan and Zoom
 
-- [ ] **PZ-01**: Scroll wheel changes zoom level (in/out)
-- [ ] **PZ-02**: Zoom is cursor-centered (point under cursor stays fixed)
-- [ ] **PZ-03**: Zoom clamped to 25%-300% range
-- [ ] **PZ-04**: User can drag to pan when zoomed in past fit-to-view
-- [ ] **PZ-05**: Panning disabled at fit-to-view zoom level
-- [ ] **PZ-06**: Double-click on canvas resets to fit-to-view
+- [x] **PZ-01**: Scroll wheel changes zoom level (in/out)
+- [x] **PZ-02**: Zoom is cursor-centered (point under cursor stays fixed)
+- [x] **PZ-03**: Zoom clamped to 25%-300% range
+- [x] **PZ-04**: User can drag to pan when zoomed in past fit-to-view
+- [x] **PZ-05**: Panning disabled at fit-to-view zoom level
+- [x] **PZ-06**: Double-click on canvas resets to fit-to-view
 - [ ] **PZ-07**: Floating zoom controls (+/-, percentage) render with glassmorphism styling
-- [ ] **PZ-08**: Store actions correctly update zoom level and pan offset
+- [x] **PZ-08**: Store actions correctly update zoom level and pan offset
 
 ## Future Requirements
 
@@ -72,14 +72,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EXPT-01 | Phase 5 | Complete |
 | EXPT-02 | Phase 5 | Complete |
 | EXPT-03 | Phase 5 | Complete |
-| PZ-01 | Phase 7 | Pending |
-| PZ-02 | Phase 7 | Pending |
-| PZ-03 | Phase 7 | Pending |
-| PZ-04 | Phase 7 | Pending |
-| PZ-05 | Phase 7 | Pending |
-| PZ-06 | Phase 7 | Pending |
+| PZ-01 | Phase 7 | Complete |
+| PZ-02 | Phase 7 | Complete |
+| PZ-03 | Phase 7 | Complete |
+| PZ-04 | Phase 7 | Complete |
+| PZ-05 | Phase 7 | Complete |
+| PZ-06 | Phase 7 | Complete |
 | PZ-07 | Phase 7 | Pending |
-| PZ-08 | Phase 7 | Pending |
+| PZ-08 | Phase 7 | Complete |
 
 **Coverage:**
 - v2.0 requirements: 17 total
