@@ -18,13 +18,13 @@ export function AdjustmentControls() {
           <div className="flex items-center justify-between mb-1">
             <label
               htmlFor={`slider-${key}`}
-              className="text-xs text-neutral-600 dark:text-neutral-400 cursor-pointer select-none"
+              className="text-xs text-neutral-600 cursor-pointer select-none"
               title="Double-click to reset"
               onDoubleClick={() => setAdjustment(key, 100)}
             >
               {label}
             </label>
-            <span className="text-xs text-neutral-500 dark:text-neutral-400 tabular-nums">
+            <span className="text-xs text-neutral-500 tabular-nums">
               {adjustments[key]}%
             </span>
           </div>
@@ -46,7 +46,7 @@ export function AdjustmentControls() {
         className={`mt-3 flex items-center justify-center gap-2 w-full px-3 py-1.5 text-sm rounded-lg transition-colors ${
           adjustments.greyscale
             ? 'bg-blue-500 text-white'
-            : 'hover:bg-neutral-200 dark:hover:bg-neutral-600 text-neutral-700 dark:text-neutral-300'
+            : 'hover:bg-neutral-200 text-neutral-700'
         }`}
         onClick={toggleGreyscale}
       >

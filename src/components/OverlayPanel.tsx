@@ -28,7 +28,7 @@ export function OverlayPanel({ open, onClose, children, className = '' }: Overla
         }`}
       >
         <div
-          className={`glass-panel w-full md:max-w-lg rounded-t-2xl border-t border-x border-neutral-200/60 dark:border-neutral-700/60 max-h-[50vh] overflow-y-auto p-4 ${className}`}
+          className={`glass-panel w-full md:max-w-lg rounded-t-2xl border-t border-x border-neutral-200/60 max-h-[50vh] overflow-y-auto p-4 ${className}`}
         >
           {children}
         </div>

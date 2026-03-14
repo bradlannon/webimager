@@ -6,7 +6,7 @@ export function TransformControls() {
     useEditorStore();
 
   const btnClass =
-    'p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-600 text-neutral-700 dark:text-neutral-300 transition-colors';
+    'p-2 rounded-lg hover:bg-neutral-200 text-neutral-700 transition-colors';
 
   return (
     <div className="space-y-3">
@@ -46,14 +46,14 @@ export function TransformControls() {
       </div>
 
       {transforms.rotation !== 0 && (
-        <p className="text-xs text-neutral-500 dark:text-neutral-400">
+        <p className="text-xs text-neutral-500">
           {transforms.rotation}&deg; rotated
         </p>
       )}
 
       <button
         type="button"
-        className="flex items-center gap-1.5 text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
+        className="flex items-center gap-1.5 text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
         onClick={resetAll}
       >
         <RefreshCw className="w-3.5 h-3.5" />

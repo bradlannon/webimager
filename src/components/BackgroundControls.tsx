@@ -15,7 +15,7 @@ export function BackgroundControls() {
         <button
           type="button"
           onClick={restoreBackground}
-          className="flex items-center gap-2 w-full px-3 py-2 text-sm text-neutral-700 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 rounded-md transition-colors"
+          className="flex items-center gap-2 w-full px-3 py-2 text-sm text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-md transition-colors"
         >
           <Undo2 className="w-4 h-4" />
           Restore Background
@@ -24,7 +24,7 @@ export function BackgroundControls() {
           type="button"
           onClick={requestRemoval}
           disabled={cropMode}
-          className="text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="text-xs text-neutral-500 hover:text-neutral-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Remove again
         </button>
@@ -39,7 +39,7 @@ export function BackgroundControls() {
           type="button"
           onClick={requestRemoval}
           disabled={cropMode}
-          className="flex items-center gap-2 w-full px-3 py-2 text-sm text-neutral-700 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 w-full px-3 py-2 text-sm text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Eraser className="w-4 h-4" />
           Remove Background
@@ -49,7 +49,7 @@ export function BackgroundControls() {
     case 'confirming':
       return (
         <div className="space-y-3">
-          <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
+          <p className="text-xs text-neutral-600 leading-relaxed">
             One-time ~45MB download. Runs entirely in your browser &mdash; your
             photo never leaves your device.
           </p>
@@ -64,7 +64,7 @@ export function BackgroundControls() {
             <button
               type="button"
               onClick={cancel}
-              className="px-3 py-1.5 text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors"
+              className="px-3 py-1.5 text-sm text-neutral-600 hover:text-neutral-800 transition-colors"
             >
               Cancel
             </button>
@@ -76,14 +76,14 @@ export function BackgroundControls() {
       return (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-neutral-600 dark:text-neutral-400">
+            <span className="text-xs text-neutral-600">
               Downloading model...
             </span>
-            <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+            <span className="text-xs font-medium text-neutral-700">
               {Math.round(downloadProgress)}%
             </span>
           </div>
-          <div className="h-2 bg-neutral-200 dark:bg-neutral-600 rounded-full overflow-hidden">
+          <div className="h-2 bg-neutral-200 rounded-full overflow-hidden">
             <div
               className="h-2 bg-blue-500 rounded-full transition-all duration-300"
               style={{ width: `${Math.round(downloadProgress)}%` }}
@@ -92,7 +92,7 @@ export function BackgroundControls() {
           <button
             type="button"
             onClick={cancel}
-            className="flex items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors"
+            className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-700 transition-colors"
           >
             <X className="w-3 h-3" />
             Cancel
@@ -105,17 +105,17 @@ export function BackgroundControls() {
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
-            <span className="text-xs text-neutral-600 dark:text-neutral-400">
+            <span className="text-xs text-neutral-600">
               Removing background...
             </span>
           </div>
-          <div className="h-2 bg-neutral-200 dark:bg-neutral-600 rounded-full overflow-hidden">
+          <div className="h-2 bg-neutral-200 rounded-full overflow-hidden">
             <div className="h-2 bg-blue-500 rounded-full animate-pulse w-full" />
           </div>
           <button
             type="button"
             onClick={cancel}
-            className="flex items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors"
+            className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-700 transition-colors"
           >
             <X className="w-3 h-3" />
             Cancel
@@ -128,7 +128,7 @@ export function BackgroundControls() {
         <button
           type="button"
           onClick={restoreBackground}
-          className="flex items-center gap-2 w-full px-3 py-2 text-sm text-neutral-700 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 rounded-md transition-colors"
+          className="flex items-center gap-2 w-full px-3 py-2 text-sm text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-md transition-colors"
         >
           <Undo2 className="w-4 h-4" />
           Restore Background
@@ -138,14 +138,14 @@ export function BackgroundControls() {
     case 'error':
       return (
         <div className="space-y-2">
-          <div className="flex items-start gap-2 text-red-600 dark:text-red-400">
+          <div className="flex items-start gap-2 text-red-600">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <p className="text-xs leading-relaxed">{error || 'Something went wrong'}</p>
           </div>
           <button
             type="button"
             onClick={requestRemoval}
-            className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-neutral-700 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 rounded-md transition-colors"
+            className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-md transition-colors"
           >
             Try Again
           </button>

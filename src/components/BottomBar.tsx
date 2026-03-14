@@ -77,7 +77,7 @@ export function BottomBar() {
       </OverlayPanel>
 
       {/* Tab bar */}
-      <nav className="glass fixed bottom-0 left-0 right-0 z-50 h-[60px] border-t border-neutral-200/60 dark:border-neutral-700/60">
+      <nav className="glass fixed bottom-0 left-0 right-0 z-50 h-[60px] border-t border-neutral-200/60">
         <div className="flex items-center justify-around h-full px-2">
           {tabs.map(({ id, label, icon: Icon }) => {
             const isActive = activeTab === id;
@@ -89,7 +89,7 @@ export function BottomBar() {
                 className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${
                   isActive
                     ? 'text-[#2A9D8F]'
-                    : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
+                    : 'text-neutral-500 hover:text-neutral-700'
                 }`}
               >
                 <Icon className="w-6 h-6" strokeWidth={isActive ? 2.25 : 1.75} />

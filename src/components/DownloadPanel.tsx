@@ -33,7 +33,7 @@ export function DownloadPanel() {
         type="button"
         disabled={!sourceImage}
         onClick={() => handleDownload('image/png')}
-        className="flex items-center justify-center gap-2 w-full px-4 py-2.5 border-2 border-[#2A9D8F] text-[#2A9D8F] dark:text-[#8ED8CE] rounded-lg hover:bg-[#2A9D8F]/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+        className="flex items-center justify-center gap-2 w-full px-4 py-2.5 border-2 border-[#2A9D8F] text-[#2A9D8F] rounded-lg hover:bg-[#2A9D8F]/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
       >
         <Download className="w-4 h-4" />
         Download PNG

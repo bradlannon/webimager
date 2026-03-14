@@ -8,7 +8,7 @@ export function Editor() {
   const cropMode = useEditorStore((s) => s.cropMode);
 
   return (
-    <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-900">
+    <div className="flex flex-col h-screen bg-neutral-100">
       <TopBar />
       {cropMode && <CropToolbar />}
       <div className="relative flex-1 overflow-hidden">

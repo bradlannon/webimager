@@ -73,15 +73,15 @@ export function CropToolbar() {
   };
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2 bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 shrink-0">
-      <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
+    <div className="flex items-center gap-3 px-4 py-2 bg-neutral-50 border-b border-neutral-200 shrink-0">
+      <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
         Crop
       </span>
 
       <select
         value={presetIndex}
         onChange={handlePresetChange}
-        className="px-2 py-1 text-sm bg-white dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 rounded-md text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="px-2 py-1 text-sm bg-white border border-neutral-300 rounded-md text-neutral-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
         {CROP_PRESETS.map((preset, i) => (
           <option key={`${preset.label}-${i}`} value={i}>
@@ -95,7 +95,7 @@ export function CropToolbar() {
       <button
         type="button"
         onClick={handleCancel}
-        className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded-md transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200 rounded-md transition-colors"
       >
         <X className="w-4 h-4" />
         Cancel

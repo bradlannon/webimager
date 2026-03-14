@@ -117,14 +117,14 @@ export function ResizeControls() {
   };
 
   const inputClass =
-    'w-full px-2 py-1 text-sm bg-neutral-100 dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 rounded text-neutral-800 dark:text-neutral-200 tabular-nums';
+    'w-full px-2 py-1 text-sm bg-neutral-100 border border-neutral-300 rounded text-neutral-800 tabular-nums';
 
   const unitLabel = isPercentage ? '%' : 'px';
 
   return (
     <div className="space-y-3">
       {/* Current dimensions display */}
-      <p className="text-xs text-neutral-500 dark:text-neutral-400">
+      <p className="text-xs text-neutral-500">
         Current: {current.w} x {current.h} px
       </p>
 
@@ -132,7 +132,7 @@ export function ResizeControls() {
       <div>
         <label
           htmlFor="resize-width"
-          className="text-xs text-neutral-600 dark:text-neutral-400"
+          className="text-xs text-neutral-600"
         >
           W ({unitLabel})
         </label>
@@ -151,7 +151,7 @@ export function ResizeControls() {
       <div className="flex items-center justify-center">
         <button
           type="button"
-          className="p-1.5 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-600 text-neutral-600 dark:text-neutral-400 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-neutral-200 text-neutral-600 transition-colors"
           onClick={() => setAspectLocked(!aspectLocked)}
           aria-label={aspectLocked ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
           title={aspectLocked ? 'Aspect ratio locked' : 'Aspect ratio unlocked'}
@@ -168,7 +168,7 @@ export function ResizeControls() {
       <div>
         <label
           htmlFor="resize-height"
-          className="text-xs text-neutral-600 dark:text-neutral-400"
+          className="text-xs text-neutral-600"
         >
           H ({unitLabel})
         </label>
@@ -184,13 +184,13 @@ export function ResizeControls() {
       </div>
 
       {/* Pixel/Percentage toggle */}
-      <div className="flex rounded-lg overflow-hidden border border-neutral-300 dark:border-neutral-600">
+      <div className="flex rounded-lg overflow-hidden border border-neutral-300">
         <button
           type="button"
           className={`flex-1 px-2 py-1 text-xs transition-colors ${
             !isPercentage
               ? 'bg-blue-500 text-white'
-              : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-600'
+              : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
           }`}
           onClick={() => isPercentage && togglePercentage()}
         >
@@ -201,7 +201,7 @@ export function ResizeControls() {
           className={`flex-1 px-2 py-1 text-xs transition-colors ${
             isPercentage
               ? 'bg-blue-500 text-white'
-              : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-600'
+              : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
           }`}
           onClick={() => !isPercentage && togglePercentage()}
         >
@@ -211,7 +211,7 @@ export function ResizeControls() {
 
       {/* Upscale warning */}
       {isUpscale && (
-        <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+        <div className="flex items-center gap-1.5 text-amber-600">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
           <span className="text-xs">Enlarging may reduce quality</span>
         </div>
@@ -223,7 +223,7 @@ export function ResizeControls() {
         disabled={unchanged || isApplying}
         className={`flex items-center justify-center gap-2 w-full px-3 py-1.5 text-sm rounded-lg transition-colors ${
           unchanged || isApplying
-            ? 'bg-neutral-200 dark:bg-neutral-700 text-neutral-400 dark:text-neutral-500 cursor-not-allowed'
+            ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed'
             : 'bg-blue-500 hover:bg-blue-600 text-white'
         }`}
         onClick={handleApply}
@@ -240,7 +240,7 @@ export function ResizeControls() {
 
       {/* Result dimensions preview */}
       {!unchanged && !isApplying && (
-        <p className="text-xs text-neutral-500 dark:text-neutral-400 text-center">
+        <p className="text-xs text-neutral-500 text-center">
           {pixelW} x {pixelH} px
         </p>
       )}
