@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach } from 'vitest'
 import { useEditorStore } from '../store/editorStore'
-import { defaultAdjustments } from '../types/editor'
+import { defaultAdjustments, defaultCrop } from '../types/editor'
 
 describe('editorStore', () => {
   beforeEach(() => {
@@ -10,6 +10,9 @@ describe('editorStore', () => {
       originalFile: null,
       wasDownscaled: false,
       transforms: { rotation: 0, flipH: false, flipV: false },
+      adjustments: { ...defaultAdjustments },
+      cropRegion: null,
+      cropMode: false,
     })
   })
 
@@ -177,6 +180,85 @@ describe('editorStore', () => {
       expect(closeCalled).toBe(true)
       expect(useEditorStore.getState().sourceImage).toBe(newBitmap)
       expect(useEditorStore.getState().wasDownscaled).toBe(true)
+    })
+
+    test('clears cropRegion and cropMode when setting new image', () => {
+      useEditorStore.setState({
+        cropRegion: { x: 10, y: 10, width: 50, height: 50 },
+        cropMode: true,
+      })
+
+      const mockBitmap = { close: () => {}, width: 100, height: 200 } as unknown as ImageBitmap
+      const mockFile = new File([''], 'test.jpg', { type: 'image/jpeg' })
+
+      useEditorStore.getState().setImage(mockBitmap, mockFile, false)
+
+      expect(useEditorStore.getState().cropRegion).toBeNull()
+      expect(useEditorStore.getState().cropMode).toBe(false)
+    })
+  })
+
+  describe('crop mode', () => {
+    test('enterCropMode sets cropMode to true and initializes cropRegion to defaultCrop', () => {
+      useEditorStore.getState().enterCropMode()
+      const state = useEditorStore.getState()
+      expect(state.cropMode).toBe(true)
+      expect(state.cropRegion).toEqual(defaultCrop)
+    })
+
+    test('enterCropMode preserves existing cropRegion', () => {
+      const existingCrop = { x: 10, y: 20, width: 60, height: 70 }
+      useEditorStore.setState({ cropRegion: existingCrop })
+      useEditorStore.getState().enterCropMode()
+      expect(useEditorStore.getState().cropRegion).toEqual(existingCrop)
+      expect(useEditorStore.getState().cropMode).toBe(true)
+    })
+
+    test('exitCropMode sets cropMode to false but preserves cropRegion', () => {
+      const crop = { x: 10, y: 20, width: 60, height: 70 }
+      useEditorStore.setState({ cropMode: true, cropRegion: crop })
+      useEditorStore.getState().exitCropMode()
+      expect(useEditorStore.getState().cropMode).toBe(false)
+      expect(useEditorStore.getState().cropRegion).toEqual(crop)
+    })
+
+    test('setCrop updates cropRegion with clamped values', () => {
+      useEditorStore.getState().setCrop({ x: 10, y: 20, width: 50, height: 60 })
+      expect(useEditorStore.getState().cropRegion).toEqual({ x: 10, y: 20, width: 50, height: 60 })
+    })
+
+    test('setCrop clamps invalid values', () => {
+      useEditorStore.getState().setCrop({ x: -5, y: -10, width: 200, height: 200 })
+      const crop = useEditorStore.getState().cropRegion!
+      expect(crop.x).toBeGreaterThanOrEqual(0)
+      expect(crop.y).toBeGreaterThanOrEqual(0)
+      expect(crop.x + crop.width).toBeLessThanOrEqual(100)
+      expect(crop.y + crop.height).toBeLessThanOrEqual(100)
+    })
+
+    test('applyCrop sets cropMode to false', () => {
+      useEditorStore.setState({ cropMode: true, cropRegion: { x: 10, y: 10, width: 50, height: 50 } })
+      useEditorStore.getState().applyCrop()
+      expect(useEditorStore.getState().cropMode).toBe(false)
+      expect(useEditorStore.getState().cropRegion).toEqual({ x: 10, y: 10, width: 50, height: 50 })
+    })
+
+    test('clearCrop nullifies cropRegion and sets cropMode to false', () => {
+      useEditorStore.setState({ cropMode: true, cropRegion: { x: 10, y: 10, width: 50, height: 50 } })
+      useEditorStore.getState().clearCrop()
+      expect(useEditorStore.getState().cropRegion).toBeNull()
+      expect(useEditorStore.getState().cropMode).toBe(false)
+    })
+
+    test('resetAll clears cropRegion and cropMode', () => {
+      useEditorStore.setState({
+        cropMode: true,
+        cropRegion: { x: 10, y: 10, width: 50, height: 50 },
+        transforms: { rotation: 90, flipH: true, flipV: true },
+      })
+      useEditorStore.getState().resetAll()
+      expect(useEditorStore.getState().cropRegion).toBeNull()
+      expect(useEditorStore.getState().cropMode).toBe(false)
     })
   })
 })

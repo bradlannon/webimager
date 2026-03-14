@@ -1,8 +1,8 @@
-import type { Transforms, Adjustments } from '../types/editor';
+import type { Transforms, Adjustments, CropRegion } from '../types/editor';
 import { renderToCanvas } from './canvas';
 
 /**
- * Download the current image with transforms and adjustments applied.
+ * Download the current image with transforms, adjustments, and crop applied.
  * Uses toBlob (not toDataURL) for memory efficiency.
  */
 export function downloadImage(
@@ -11,13 +11,14 @@ export function downloadImage(
   adjustments: Adjustments,
   format: 'image/jpeg' | 'image/png',
   quality: number,
-  filename?: string
+  filename?: string,
+  crop?: CropRegion
 ): void {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  renderToCanvas(ctx, source, transforms, adjustments);
+  renderToCanvas(ctx, source, transforms, adjustments, crop);
 
   const ext = format === 'image/jpeg' ? '.jpg' : '.png';
   const qualityParam = format === 'image/jpeg' ? quality : undefined;

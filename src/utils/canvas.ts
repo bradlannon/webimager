@@ -1,4 +1,5 @@
-import type { Transforms, Adjustments } from '../types/editor';
+import type { Transforms, Adjustments, CropRegion } from '../types/editor';
+import { cropToPixels } from './crop';
 
 export const MAX_CANVAS_PIXELS = 16_777_216;
 
@@ -33,24 +34,57 @@ export function renderToCanvas(
   ctx: CanvasRenderingContext2D,
   source: ImageBitmap,
   transforms: Transforms,
-  adjustments?: Adjustments
+  adjustments?: Adjustments,
+  crop?: CropRegion
 ): void {
   const { rotation, flipH, flipV } = transforms;
   const isRotated90 = rotation === 90 || rotation === 270;
-  const drawW = isRotated90 ? source.height : source.width;
-  const drawH = isRotated90 ? source.width : source.height;
+  const rotatedW = isRotated90 ? source.height : source.width;
+  const rotatedH = isRotated90 ? source.width : source.height;
 
-  ctx.canvas.width = drawW;
-  ctx.canvas.height = drawH;
-  ctx.save();
-  ctx.translate(drawW / 2, drawH / 2);
-  ctx.rotate((rotation * Math.PI) / 180);
-  ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
-  if (adjustments) {
-    ctx.filter = buildFilterString(adjustments);
+  // Check if crop is active and not the full image
+  const hasCrop = crop && !(crop.x === 0 && crop.y === 0 && crop.width === 100 && crop.height === 100);
+
+  if (hasCrop) {
+    // Crop-aware rendering: use offscreen canvas for rotation, then extract crop
+    const { sx, sy, sw, sh } = cropToPixels(crop, rotatedW, rotatedH);
+
+    // Step 1: Render source with rotation/flip onto offscreen canvas
+    const offscreen = document.createElement('canvas');
+    offscreen.width = rotatedW;
+    offscreen.height = rotatedH;
+    const offCtx = offscreen.getContext('2d')!;
+
+    offCtx.save();
+    offCtx.translate(rotatedW / 2, rotatedH / 2);
+    offCtx.rotate((rotation * Math.PI) / 180);
+    offCtx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+    offCtx.drawImage(source, -source.width / 2, -source.height / 2);
+    offCtx.restore();
+
+    // Step 2: Set output canvas to crop dimensions and extract crop region
+    ctx.canvas.width = sw;
+    ctx.canvas.height = sh;
+    ctx.save();
+    if (adjustments) {
+      ctx.filter = buildFilterString(adjustments);
+    }
+    ctx.drawImage(offscreen, sx, sy, sw, sh, 0, 0, sw, sh);
+    ctx.restore();
+  } else {
+    // No crop: existing fast path
+    ctx.canvas.width = rotatedW;
+    ctx.canvas.height = rotatedH;
+    ctx.save();
+    ctx.translate(rotatedW / 2, rotatedH / 2);
+    ctx.rotate((rotation * Math.PI) / 180);
+    ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+    if (adjustments) {
+      ctx.filter = buildFilterString(adjustments);
+    }
+    ctx.drawImage(source, -source.width / 2, -source.height / 2);
+    ctx.restore();
   }
-  ctx.drawImage(source, -source.width / 2, -source.height / 2);
-  ctx.restore();
 }
 
 export function drawCheckerboard(

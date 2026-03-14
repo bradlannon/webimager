@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import type { Transforms, Adjustments } from '../types/editor';
-import { defaultTransforms, defaultAdjustments } from '../types/editor';
+import type { Transforms, Adjustments, CropRegion } from '../types/editor';
+import { defaultTransforms, defaultAdjustments, defaultCrop } from '../types/editor';
+import { clampCrop } from '../utils/crop';
 
 interface EditorStore {
   // Image state
@@ -14,6 +15,10 @@ interface EditorStore {
   // Adjustment state
   adjustments: Adjustments;
 
+  // Crop state
+  cropRegion: CropRegion | null;
+  cropMode: boolean;
+
   // Actions
   setImage: (bitmap: ImageBitmap, file: File, wasDownscaled: boolean) => void;
   rotateLeft: () => void;
@@ -23,6 +28,14 @@ interface EditorStore {
   setAdjustment: (key: keyof Omit<Adjustments, 'greyscale'>, value: number) => void;
   toggleGreyscale: () => void;
   resetAll: () => void;
+
+  // Crop actions
+  enterCropMode: () => void;
+  exitCropMode: () => void;
+  setCrop: (region: CropRegion) => void;
+  applyCrop: () => void;
+  clearCrop: () => void;
+  applyResize: (width: number, height: number) => Promise<void>;
 }
 
 export const useEditorStore = create<EditorStore>((set, get) => ({
@@ -31,6 +44,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   wasDownscaled: false,
   transforms: { ...defaultTransforms },
   adjustments: { ...defaultAdjustments },
+  cropRegion: null,
+  cropMode: false,
 
   setImage: (bitmap, file, wasDownscaled) => {
     const old = get().sourceImage;
@@ -41,6 +56,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       wasDownscaled,
       transforms: { ...defaultTransforms },
       adjustments: { ...defaultAdjustments },
+      cropRegion: null,
+      cropMode: false,
     });
   },
 
@@ -80,5 +97,54 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       adjustments: { ...s.adjustments, greyscale: !s.adjustments.greyscale },
     })),
 
-  resetAll: () => set({ transforms: { ...defaultTransforms }, adjustments: { ...defaultAdjustments } }),
+  resetAll: () => set({
+    transforms: { ...defaultTransforms },
+    adjustments: { ...defaultAdjustments },
+    cropRegion: null,
+    cropMode: false,
+  }),
+
+  enterCropMode: () =>
+    set((s) => ({
+      cropMode: true,
+      cropRegion: s.cropRegion ?? { ...defaultCrop },
+    })),
+
+  exitCropMode: () => set({ cropMode: false }),
+
+  setCrop: (region) => set({ cropRegion: clampCrop(region) }),
+
+  applyCrop: () => set({ cropMode: false }),
+
+  clearCrop: () => set({ cropRegion: null, cropMode: false }),
+
+  applyResize: async (width, height) => {
+    const state = get();
+    if (!state.sourceImage) return;
+
+    // Render current state (with crop + transforms) to an offscreen canvas
+    const { renderToCanvas } = await import('../utils/canvas');
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    renderToCanvas(ctx, state.sourceImage, state.transforms, state.adjustments, state.cropRegion ?? undefined);
+
+    // Create resized bitmap from the rendered result
+    const resized = await createImageBitmap(canvas, {
+      resizeWidth: width,
+      resizeHeight: height,
+      resizeQuality: 'high',
+    });
+
+    const old = state.sourceImage;
+    set({
+      sourceImage: resized,
+      transforms: { ...defaultTransforms },
+      adjustments: { ...defaultAdjustments },
+      cropRegion: null,
+      cropMode: false,
+    });
+    old.close();
+  },
 }));
