@@ -76,24 +76,24 @@ export function BottomBar() {
         {activeTab && <PanelContent tabId={activeTab} />}
       </OverlayPanel>
 
-      {/* Tab bar */}
-      <nav className="glass fixed bottom-0 left-0 right-0 z-50 h-[60px] border-t border-neutral-200/60">
-        <div className="flex items-center justify-around h-full px-2">
+      {/* Tab bar — compact on mobile (icons only, 48px), full on desktop (icons + labels, 56px) */}
+      <nav className="glass fixed bottom-0 left-0 right-0 z-50 h-[48px] md:h-[56px] border-t border-neutral-200/60">
+        <div className="flex items-center justify-around h-full px-1 md:px-2">
           {tabs.map(({ id, label, icon: Icon }) => {
-            const isActive = activeTab === id;
+            const isActive = activeTab === id || (id === 'crop' && cropMode);
             return (
               <button
                 key={id}
                 type="button"
                 onClick={() => handleTabClick(id)}
-                className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${
+                className={`flex flex-col items-center justify-center gap-0 md:gap-0.5 flex-1 h-full transition-colors ${
                   isActive
                     ? 'text-[#2A9D8F]'
                     : 'text-neutral-500 hover:text-neutral-700'
                 }`}
               >
-                <Icon className="w-6 h-6" strokeWidth={isActive ? 2.25 : 1.75} />
-                <span className="text-xs font-semibold">{label}</span>
+                <Icon className="w-5 h-5 md:w-6 md:h-6" strokeWidth={isActive ? 2.25 : 1.75} />
+                <span className="hidden md:block text-xs font-semibold">{label}</span>
               </button>
             );
           })}

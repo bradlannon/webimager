@@ -12,7 +12,7 @@ export function Editor() {
       <TopBar />
       <div style={{ height: '64px' }} className="shrink-0" />
       {cropMode && <CropToolbar />}
-      <div className="relative flex-1 overflow-hidden pb-[60px]">
+      <div className="relative flex-1 overflow-hidden pb-[48px] md:pb-[56px]">
         <Canvas />
       </div>
       <BottomBar />

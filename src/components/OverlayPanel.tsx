@@ -12,23 +12,25 @@ export function OverlayPanel({ open, onClose, children, className = '' }: Overla
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 top-14 bottom-[60px] z-30 bg-black/20 transition-opacity duration-250 ease-out ${
+        className={`fixed inset-0 z-30 bg-black/20 transition-opacity duration-250 ease-out ${
           open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
+        style={{ top: '64px', bottom: '48px' }}
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Panel */}
       <div
-        className={`fixed left-0 right-0 bottom-[60px] z-40 flex justify-center transition-all duration-250 ease-out ${
+        className={`fixed left-0 right-0 z-40 flex justify-center transition-all duration-250 ease-out ${
           open
             ? 'opacity-100 pointer-events-auto translate-y-0'
             : 'opacity-0 pointer-events-none translate-y-full'
         }`}
+        style={{ bottom: '48px' }}
       >
         <div
-          className={`glass-panel w-full md:max-w-lg rounded-t-2xl border-t border-x border-neutral-200/60 max-h-[50vh] overflow-y-auto p-4 ${className}`}
+          className={`glass-panel w-full max-h-[35vh] md:max-w-lg md:max-h-[40vh] rounded-t-2xl border-t border-x border-neutral-200/60 overflow-y-auto p-3 md:p-4 ${className}`}
         >
           {children}
         </div>

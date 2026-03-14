@@ -43,11 +43,10 @@ export function Canvas() {
       displayH = Math.round((cropRegion.height / 100) * displayH);
     }
 
-    // Fit to container
+    // Fit to container — allow upscale to fill space
     const scale = Math.min(
       containerWidth / displayW,
       containerHeight / displayH,
-      1 // Don't upscale
     );
 
     setCanvasStyle({
@@ -96,7 +95,7 @@ export function Canvas() {
   return (
     <div
       ref={containerRef}
-      className="flex-1 flex items-center justify-center overflow-hidden bg-neutral-900 p-4"
+      className="flex-1 flex items-center justify-center overflow-hidden bg-neutral-800"
     >
       <div className="relative" style={{ width: canvasRect.width, height: canvasRect.height }}>
         <canvas
