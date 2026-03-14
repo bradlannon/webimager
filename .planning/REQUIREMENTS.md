@@ -18,9 +18,9 @@ Requirements for v2.0 milestone. Each maps to roadmap phases.
 
 ### Export Integration
 
-- [ ] **EXPT-01**: Download format auto-switches to PNG when transparency is active
-- [ ] **EXPT-02**: JPEG export fills transparent areas with white
-- [ ] **EXPT-03**: Warning shown when user selects JPEG with transparency active
+- [x] **EXPT-01**: Download format auto-switches to PNG when transparency is active
+- [x] **EXPT-02**: JPEG export fills transparent areas with white
+- [x] **EXPT-03**: Warning shown when user selects JPEG with transparency active
 
 ## Future Requirements
 
@@ -58,9 +58,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BGREM-04 | Phase 4 | Pending |
 | BGREM-05 | Phase 4 | Complete |
 | BGREM-06 | Phase 5 | Pending |
-| EXPT-01 | Phase 5 | Pending |
-| EXPT-02 | Phase 5 | Pending |
-| EXPT-03 | Phase 5 | Pending |
+| EXPT-01 | Phase 5 | Complete |
+| EXPT-02 | Phase 5 | Complete |
+| EXPT-03 | Phase 5 | Complete |
 
 **Coverage:**
 - v2.0 requirements: 9 total

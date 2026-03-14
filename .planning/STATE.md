@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: AI Background Removal
-status: completed
-stopped_at: Completed 06-02-PLAN.md (Phase 6 complete)
-last_updated: "2026-03-14T17:08:08.966Z"
-last_activity: 2026-03-14 — Completed 06-02 Editor layout rewire and panel polish
+status: in-progress
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-03-14T20:15:37Z"
+last_activity: 2026-03-14 — Completed 05-01 Transparency-aware export
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 5
-  completed_plans: 4
-  percent: 92
+  completed_plans: 5
+  percent: 100
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-14)
 
 **Core value:** Users can quickly edit a photo and download the result without installing software, creating an account, or uploading to a server.
-**Current focus:** Phase 6: Sidebar Redesign
+**Current focus:** Phase 5: Export and Background Replacement
 
 ## Current Position
 
-Phase: 6 of 6 (Sidebar Redesign)
-Plan: 2 of 2 in current phase (COMPLETE)
-Status: Phase 6 Complete
-Last activity: 2026-03-14 — Completed 06-02 Editor layout rewire and panel polish
+Phase: 5 of 6 (Export and Background Replacement)
+Plan: 1 of 2 in current phase
+Status: Plan 05-01 Complete
+Last activity: 2026-03-14 — Completed 05-01 Transparency-aware export
 
-Progress: [█████████░] 92%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 12 (8 v1.0 + 4 v2.0)
-- Average duration: 7.9min
-- Total execution time: 1.57 hours
+- Total plans completed: 13 (8 v1.0 + 5 v2.0)
+- Average duration: 7.5min
+- Total execution time: 1.60 hours
 
 **By Phase:**
 
@@ -48,13 +48,14 @@ Progress: [█████████░] 92%
 | 03-crop-resize | 3/3 | 19min | 6.3min |
 | 04-background-removal | 2/3 | 5min | 2.5min |
 | 06-sidebar-redesign | 2/2 | 53min | 26.5min |
+| 05-export-bg-replace | 1/2 | 2min | 2min |
 
 **Recent Trend:**
-- Last 5 plans: 3min, 3min, 2min, 2min, 51min
+- Last 5 plans: 3min, 2min, 2min, 51min, 2min
 - Trend: Variable (06-02 included visual checkpoint with iterative fixes)
 
 *Updated after each plan completion*
-| Phase 06 P02 | 51min | 3 tasks | 15 files |
+| Phase 05 P01 | 2min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,8 @@ Recent decisions affecting current work:
 - [06-02]: Crop tab auto-enters crop mode instead of showing intermediate panel
 - [06-02]: Download simplified to two buttons (PNG and JPEG) instead of format selector
 - [06-02]: TopBar renders on landing page as well as editor for consistent navigation
+- [05-01]: White-fill uses second offscreen canvas with drawImage compositing rather than pixel manipulation
+- [05-01]: Button order swaps dynamically based on backgroundRemoved state rather than hiding/showing buttons
 
 ### Roadmap Evolution
 
@@ -91,6 +94,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-14T17:08:08.963Z
-Stopped at: Completed 06-02-PLAN.md (Phase 6 complete)
+Last session: 2026-03-14T20:15:37Z
+Stopped at: Completed 05-01-PLAN.md
 Resume file: None

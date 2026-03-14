@@ -54,7 +54,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — Transparency-aware export: JPEG white-fill, auto-PNG promotion, JPEG warning
+- [x] 05-01-PLAN.md — Transparency-aware export: JPEG white-fill, auto-PNG promotion, JPEG warning
 - [ ] 05-02-PLAN.md — Background replacement: solid color picker with canvas preview
 
 ### Phase 6: Sidebar Redesign - Move sidebar to bottom bar with professional UI design
@@ -84,5 +84,5 @@ Phases execute in numeric order: 4 → 5 → 6
 | 2. Adjustments | v1.0 | 2/2 | Complete | 2026-03-14 |
 | 3. Crop & Resize | v1.0 | 3/3 | Complete | 2026-03-14 |
 | 4. Background Removal Engine | 2/3 | In Progress|  | - |
-| 5. Export and Background Replacement | v2.0 | 0/2 | Not started | - |
+| 5. Export and Background Replacement | v2.0 | 1/2 | In Progress | - |
 | 6. Sidebar Redesign | 2/2 | Complete   | 2026-03-14 | 2026-03-14 |
