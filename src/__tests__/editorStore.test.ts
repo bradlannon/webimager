@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach } from 'vitest'
 import { useEditorStore } from '../store/editorStore'
+import { defaultAdjustments } from '../types/editor'
 
 describe('editorStore', () => {
   beforeEach(() => {
@@ -88,6 +89,41 @@ describe('editorStore', () => {
     })
   })
 
+  describe('adjustments', () => {
+    test('initial state has default adjustments', () => {
+      const { adjustments } = useEditorStore.getState()
+      expect(adjustments).toEqual(defaultAdjustments)
+    })
+
+    test('setAdjustment sets brightness', () => {
+      useEditorStore.getState().setAdjustment('brightness', 150)
+      expect(useEditorStore.getState().adjustments.brightness).toBe(150)
+    })
+
+    test('setAdjustment sets contrast', () => {
+      useEditorStore.getState().setAdjustment('contrast', 80)
+      expect(useEditorStore.getState().adjustments.contrast).toBe(80)
+    })
+
+    test('setAdjustment sets saturation', () => {
+      useEditorStore.getState().setAdjustment('saturation', 0)
+      expect(useEditorStore.getState().adjustments.saturation).toBe(0)
+    })
+
+    test('toggleGreyscale toggles from false to true', () => {
+      useEditorStore.getState().toggleGreyscale()
+      expect(useEditorStore.getState().adjustments.greyscale).toBe(true)
+    })
+
+    test('toggleGreyscale toggles from true to false', () => {
+      useEditorStore.setState({
+        adjustments: { ...defaultAdjustments, greyscale: true },
+      })
+      useEditorStore.getState().toggleGreyscale()
+      expect(useEditorStore.getState().adjustments.greyscale).toBe(false)
+    })
+  })
+
   describe('resetAll', () => {
     test('returns transforms to defaults', () => {
       useEditorStore.setState({ transforms: { rotation: 180, flipH: true, flipV: true } })
@@ -96,6 +132,14 @@ describe('editorStore', () => {
       expect(transforms.rotation).toBe(0)
       expect(transforms.flipH).toBe(false)
       expect(transforms.flipV).toBe(false)
+    })
+
+    test('returns adjustments to defaults', () => {
+      useEditorStore.setState({
+        adjustments: { brightness: 150, contrast: 80, saturation: 50, greyscale: true },
+      })
+      useEditorStore.getState().resetAll()
+      expect(useEditorStore.getState().adjustments).toEqual(defaultAdjustments)
     })
   })
 
@@ -117,6 +161,7 @@ describe('editorStore', () => {
       expect(state.transforms.rotation).toBe(0)
       expect(state.transforms.flipH).toBe(false)
       expect(state.transforms.flipV).toBe(false)
+      expect(state.adjustments).toEqual(defaultAdjustments)
     })
 
     test('closes previous bitmap when setting new image', () => {

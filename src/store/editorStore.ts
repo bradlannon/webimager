@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { Transforms } from '../types/editor';
-import { defaultTransforms } from '../types/editor';
+import type { Transforms, Adjustments } from '../types/editor';
+import { defaultTransforms, defaultAdjustments } from '../types/editor';
 
 interface EditorStore {
   // Image state
@@ -11,12 +11,17 @@ interface EditorStore {
   // Transform state
   transforms: Transforms;
 
+  // Adjustment state
+  adjustments: Adjustments;
+
   // Actions
   setImage: (bitmap: ImageBitmap, file: File, wasDownscaled: boolean) => void;
   rotateLeft: () => void;
   rotateRight: () => void;
   flipHorizontal: () => void;
   flipVertical: () => void;
+  setAdjustment: (key: keyof Omit<Adjustments, 'greyscale'>, value: number) => void;
+  toggleGreyscale: () => void;
   resetAll: () => void;
 }
 
@@ -25,6 +30,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   originalFile: null,
   wasDownscaled: false,
   transforms: { ...defaultTransforms },
+  adjustments: { ...defaultAdjustments },
 
   setImage: (bitmap, file, wasDownscaled) => {
     const old = get().sourceImage;
@@ -34,6 +40,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       originalFile: file,
       wasDownscaled,
       transforms: { ...defaultTransforms },
+      adjustments: { ...defaultAdjustments },
     });
   },
 
@@ -63,5 +70,15 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       transforms: { ...s.transforms, flipV: !s.transforms.flipV },
     })),
 
-  resetAll: () => set({ transforms: { ...defaultTransforms } }),
+  setAdjustment: (key, value) =>
+    set((s) => ({
+      adjustments: { ...s.adjustments, [key]: value },
+    })),
+
+  toggleGreyscale: () =>
+    set((s) => ({
+      adjustments: { ...s.adjustments, greyscale: !s.adjustments.greyscale },
+    })),
+
+  resetAll: () => set({ transforms: { ...defaultTransforms }, adjustments: { ...defaultAdjustments } }),
 }));
