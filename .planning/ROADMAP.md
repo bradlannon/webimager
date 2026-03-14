@@ -90,10 +90,25 @@ Plans:
 - [ ] 07-01-PLAN.md — Zoom math utilities, store extension, Canvas zoom/pan engine with events and cursors
 - [ ] 07-02-PLAN.md — ZoomControls floating UI widget, visual checkpoint
 
+### Phase 8: Background Removal Bug Fixes
+**Goal:** Fix background removal state management bugs found during milestone audit — restore action, resize interaction, and dead code cleanup
+**Depends on:** Phase 7
+**Requirements**: BGREM-04, BGREM-05
+**Gap Closure:** Closes gaps from v2.0 audit
+**Success Criteria** (what must be TRUE):
+  1. Clicking "Restore Background" fully clears background removal state (mask, flag, replacement color) — no stale mask in memory
+  2. Applying resize after background removal clears background state cleanly (no stale mask compositing)
+  3. BGREM-04 checkerboard requirement verified as satisfied via CSS implementation
+  4. No dead imports related to background removal in the codebase
+**Plans**: 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 8 to break down)
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 4 → 5 → 6 → 7
+Phases execute in numeric order: 4 → 5 → 6 → 7 → 8
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -104,3 +119,4 @@ Phases execute in numeric order: 4 → 5 → 6 → 7
 | 5. Export and Background Replacement | v2.0 | 1/2 | In Progress | - |
 | 6. Sidebar Redesign | 2/2 | Complete   | 2026-03-14 | 2026-03-14 |
 | 7. Pan and Zoom | 2/2 | Complete   | 2026-03-14 | - |
+| 8. BG Removal Bug Fixes | 0/0 | Pending | - | - |
