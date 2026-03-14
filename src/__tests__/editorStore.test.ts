@@ -314,4 +314,37 @@ describe('editorStore', () => {
       expect(state.backgroundMask).toBeNull()
     })
   })
+
+  describe('replacementColor', () => {
+    test('setReplacementColor sets replacementColor to a hex value', () => {
+      useEditorStore.getState().setReplacementColor('#ff0000')
+      expect(useEditorStore.getState().replacementColor).toBe('#ff0000')
+    })
+
+    test('setReplacementColor(null) clears replacementColor to null', () => {
+      useEditorStore.setState({ replacementColor: '#ff0000' })
+      useEditorStore.getState().setReplacementColor(null)
+      expect(useEditorStore.getState().replacementColor).toBeNull()
+    })
+
+    test('clearBackgroundMask also resets replacementColor to null', () => {
+      useEditorStore.setState({ replacementColor: '#00ff00', backgroundMask: mockMask, backgroundRemoved: true })
+      useEditorStore.getState().clearBackgroundMask()
+      expect(useEditorStore.getState().replacementColor).toBeNull()
+    })
+
+    test('setImage resets replacementColor to null', () => {
+      useEditorStore.setState({ replacementColor: '#0000ff' })
+      const mockBitmap = { close: () => {}, width: 100, height: 200 } as unknown as ImageBitmap
+      const mockFile = new File([''], 'test.jpg', { type: 'image/jpeg' })
+      useEditorStore.getState().setImage(mockBitmap, mockFile, false)
+      expect(useEditorStore.getState().replacementColor).toBeNull()
+    })
+
+    test('resetAll resets replacementColor to null', () => {
+      useEditorStore.setState({ replacementColor: '#ffffff' })
+      useEditorStore.getState().resetAll()
+      expect(useEditorStore.getState().replacementColor).toBeNull()
+    })
+  })
 })
