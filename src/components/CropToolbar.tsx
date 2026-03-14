@@ -2,26 +2,21 @@ import { useState, useEffect } from 'react';
 import { Check, X } from 'lucide-react';
 import { useEditorStore } from '../store/editorStore';
 import { CROP_PRESETS, constrainToAspectRatio } from '../utils/crop';
-import type { CropRegion } from '../types/editor';
 
-interface CropToolbarProps {
-  aspectRatio: number | null;
-  onAspectRatioChange: (ratio: number | null) => void;
-}
-
-export function CropToolbar({ aspectRatio, onAspectRatioChange }: CropToolbarProps) {
+export function CropToolbar() {
   const applyCrop = useEditorStore((s) => s.applyCrop);
   const exitCropMode = useEditorStore((s) => s.exitCropMode);
   const clearCrop = useEditorStore((s) => s.clearCrop);
   const cropRegion = useEditorStore((s) => s.cropRegion);
   const setCrop = useEditorStore((s) => s.setCrop);
+  const cropAspectRatio = useEditorStore((s) => s.cropAspectRatio);
+  const setCropAspectRatio = useEditorStore((s) => s.setCropAspectRatio);
   const sourceImage = useEditorStore((s) => s.sourceImage);
   const transforms = useEditorStore((s) => s.transforms);
 
   // Track whether a crop existed before entering crop mode
   const [hadCropBefore] = useState(() => {
     const region = useEditorStore.getState().cropRegion;
-    // A crop "existed" if it was not the full image
     return region !== null && !(region.x === 0 && region.y === 0 && region.width === 100 && region.height === 100);
   });
 
@@ -32,21 +27,21 @@ export function CropToolbar({ aspectRatio, onAspectRatioChange }: CropToolbarPro
 
   const [presetIndex, setPresetIndex] = useState(0);
 
-  // Find preset index matching current aspect ratio
+  // Sync preset index with store aspect ratio
   useEffect(() => {
-    if (aspectRatio === null) {
+    if (cropAspectRatio === null) {
       setPresetIndex(0);
     } else {
-      const idx = CROP_PRESETS.findIndex((p) => p.ratio !== null && Math.abs(p.ratio - aspectRatio) < 0.001);
+      const idx = CROP_PRESETS.findIndex((p) => p.ratio !== null && Math.abs(p.ratio - cropAspectRatio) < 0.001);
       if (idx >= 0) setPresetIndex(idx);
     }
-  }, [aspectRatio]);
+  }, [cropAspectRatio]);
 
   const handlePresetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const idx = parseInt(e.target.value, 10);
     setPresetIndex(idx);
     const preset = CROP_PRESETS[idx];
-    onAspectRatioChange(preset.ratio);
+    setCropAspectRatio(preset.ratio);
 
     // Immediately constrain current crop to the new ratio
     if (preset.ratio !== null && cropRegion) {
@@ -78,7 +73,7 @@ export function CropToolbar({ aspectRatio, onAspectRatioChange }: CropToolbarPro
   };
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2 bg-neutral-50 dark:bg-neutral-750 border-b border-neutral-200 dark:border-neutral-700 shrink-0">
+    <div className="flex items-center gap-3 px-4 py-2 bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 shrink-0">
       <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
         Crop
       </span>
@@ -89,7 +84,7 @@ export function CropToolbar({ aspectRatio, onAspectRatioChange }: CropToolbarPro
         className="px-2 py-1 text-sm bg-white dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 rounded-md text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
         {CROP_PRESETS.map((preset, i) => (
-          <option key={preset.label} value={i}>
+          <option key={`${preset.label}-${i}`} value={i}>
             {preset.label}
           </option>
         ))}

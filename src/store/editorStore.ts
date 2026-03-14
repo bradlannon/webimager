@@ -18,6 +18,7 @@ interface EditorStore {
   // Crop state
   cropRegion: CropRegion | null;
   cropMode: boolean;
+  cropAspectRatio: number | null;
 
   // Actions
   setImage: (bitmap: ImageBitmap, file: File, wasDownscaled: boolean) => void;
@@ -35,6 +36,7 @@ interface EditorStore {
   setCrop: (region: CropRegion) => void;
   applyCrop: () => void;
   clearCrop: () => void;
+  setCropAspectRatio: (ratio: number | null) => void;
   applyResize: (width: number, height: number) => Promise<void>;
 }
 
@@ -46,6 +48,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   adjustments: { ...defaultAdjustments },
   cropRegion: null,
   cropMode: false,
+  cropAspectRatio: null,
 
   setImage: (bitmap, file, wasDownscaled) => {
     const old = get().sourceImage;
@@ -58,6 +61,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       adjustments: { ...defaultAdjustments },
       cropRegion: null,
       cropMode: false,
+      cropAspectRatio: null,
     });
   },
 
@@ -102,6 +106,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     adjustments: { ...defaultAdjustments },
     cropRegion: null,
     cropMode: false,
+    cropAspectRatio: null,
   }),
 
   enterCropMode: () =>
@@ -116,7 +121,9 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 
   applyCrop: () => set({ cropMode: false }),
 
-  clearCrop: () => set({ cropRegion: null, cropMode: false }),
+  clearCrop: () => set({ cropRegion: null, cropMode: false, cropAspectRatio: null }),
+
+  setCropAspectRatio: (ratio) => set({ cropAspectRatio: ratio }),
 
   applyResize: async (width, height) => {
     const state = get();

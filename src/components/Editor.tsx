@@ -1,12 +1,15 @@
-import { Info, ImagePlus } from 'lucide-react';
+import { Info, ImagePlus, Crop } from 'lucide-react';
 import { useEditorStore } from '../store/editorStore';
 import { Canvas } from './Canvas';
 import { Sidebar } from './Sidebar';
+import { CropToolbar } from './CropToolbar';
 
 export function Editor() {
   const wasDownscaled = useEditorStore((s) => s.wasDownscaled);
   const resetAll = useEditorStore((s) => s.resetAll);
   const sourceImage = useEditorStore((s) => s.sourceImage);
+  const cropMode = useEditorStore((s) => s.cropMode);
+  const enterCropMode = useEditorStore((s) => s.enterCropMode);
 
   const handleNewImage = () => {
     if (sourceImage) {
@@ -31,6 +34,16 @@ export function Editor() {
               Image was resized for best performance
             </span>
           )}
+          {!cropMode && (
+            <button
+              type="button"
+              onClick={enterCropMode}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-md transition-colors"
+            >
+              <Crop className="w-4 h-4" />
+              Crop
+            </button>
+          )}
           <button
             type="button"
             onClick={handleNewImage}
@@ -41,6 +54,9 @@ export function Editor() {
           </button>
         </div>
       </div>
+
+      {/* Crop toolbar (shown during crop mode) */}
+      {cropMode && <CropToolbar />}
 
       {/* Main editor area */}
       <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
