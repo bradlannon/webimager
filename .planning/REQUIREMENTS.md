@@ -17,8 +17,8 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Transforms
 
 - [ ] **TRAN-01**: User can resize image by entering width/height with aspect ratio lock toggle
-- [ ] **TRAN-02**: User can rotate image 90 degrees left or right
-- [ ] **TRAN-03**: User can flip image horizontally or vertically
+- [x] **TRAN-02**: User can rotate image 90 degrees left or right
+- [x] **TRAN-03**: User can flip image horizontally or vertically
 
 ### Crop
 
@@ -34,7 +34,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### UX
 
-- [ ] **UX-01**: All effects render as live preview in real-time
+- [x] **UX-01**: All effects render as live preview in real-time
 - [ ] **UX-02**: Privacy indicator shows users their photo never leaves the browser
 
 ## v2 Requirements
@@ -70,15 +70,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FILE-03 | Phase 1 | Pending |
 | FILE-04 | Phase 1 | Pending |
 | TRAN-01 | Phase 3 | Pending |
-| TRAN-02 | Phase 1 | Pending |
-| TRAN-03 | Phase 1 | Pending |
+| TRAN-02 | Phase 1 | Complete |
+| TRAN-03 | Phase 1 | Complete |
 | CROP-01 | Phase 3 | Pending |
 | CROP-02 | Phase 3 | Pending |
 | ADJT-01 | Phase 2 | Pending |
 | ADJT-02 | Phase 2 | Pending |
 | ADJT-03 | Phase 2 | Pending |
 | ADJT-04 | Phase 2 | Pending |
-| UX-01 | Phase 1 | Pending |
+| UX-01 | Phase 1 | Complete |
 | UX-02 | Phase 1 | Pending |
 
 **Coverage:**
