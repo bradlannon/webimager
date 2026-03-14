@@ -1,6 +1,6 @@
 import { useEffect, type RefObject } from 'react';
 import { useEditorStore } from '../store/editorStore';
-import { renderToCanvas, drawCheckerboard } from '../utils/canvas';
+import { renderToCanvas } from '../utils/canvas';
 
 export function useRenderPipeline(canvasRef: RefObject<HTMLCanvasElement | null>) {
   const sourceImage = useEditorStore((s) => s.sourceImage);
