@@ -29,7 +29,7 @@ Users can quickly edit a photo and download the result without installing softwa
 
 ### Active
 
-(None — planning next milestone)
+- [ ] One-click AI-powered background removal (runs locally in-browser via WASM model)
 
 ### Out of Scope
 
@@ -38,7 +38,7 @@ Users can quickly edit a photo and download the result without installing softwa
 - Backend processing — everything runs in-browser
 - Mobile-native app — web-only, responsive design
 - Layers / undo history stack — keep it simple
-- AI-powered effects — requires server or large model downloads
+- Server-side AI effects — violates client-only constraint (in-browser ML is allowed)
 
 ## Context
 
@@ -47,7 +47,8 @@ Users can quickly edit a photo and download the result without installing softwa
 - 114 Vitest tests across 9 test files
 - Inspired by DonsPhotoApp (native macOS/Swift app for simple photo processing)
 - Deployable as a static site (GitHub Pages, Netlify, Vercel) with zero infrastructure cost
-- v2 candidates: blur/sharpen, preset filters (sepia, vintage, etc.), before/after comparison
+- v2.0: AI-powered background removal (in-browser ML model, ~10MB download on first use)
+- Future candidates: blur/sharpen, preset filters (sepia, vintage, etc.), before/after comparison
 
 ## Constraints
 
@@ -71,4 +72,4 @@ Users can quickly edit a photo and download the result without installing softwa
 | Crop follows transforms | Coordinates transform with flip/rotate for correct region tracking | ✓ Good (bug found and fixed) |
 
 ---
-*Last updated: 2026-03-14 after v1.0 milestone*
+*Last updated: 2026-03-14 after v2.0 milestone start*

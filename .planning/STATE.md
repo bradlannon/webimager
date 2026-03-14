@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: completed
-stopped_at: Completed 03-03-PLAN.md (resize controls UI)
+milestone: v2.0
+milestone_name: Background Removal
+status: active
+stopped_at: Defining requirements
 last_updated: "2026-03-14T05:36:42.516Z"
 last_activity: 2026-03-14 -- Completed 03-03-PLAN.md (resize controls UI)
 progress:
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-03-13)
 
 ## Current Position
 
-Phase: 3 of 3 (Crop & Resize)
-Plan: 3 of 3 in current phase
-Status: Complete
-Last activity: 2026-03-14 -- Completed 03-03-PLAN.md (resize controls UI)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-14 — Milestone v2.0 started
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
