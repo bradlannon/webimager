@@ -1,215 +1,239 @@
 # Project Research Summary
 
-**Project:** WebImager (browser-based image editor)
-**Domain:** Client-side single-image photo editing tool
-**Researched:** 2026-03-13
+**Project:** WebImager v2.0 — AI Background Removal
+**Domain:** In-browser ML inference integrated into existing canvas-based image editor
+**Researched:** 2026-03-14
 **Confidence:** HIGH
 
 ## Executive Summary
 
-WebImager is a client-side, no-signup, single-image photo editor occupying a specific niche: simpler than Photopea but more capable than minimal tools like PicResize, and fully private unlike server-side editors like Pixlr or BeFunky. Experts build this type of tool with vanilla TypeScript and the HTML5 Canvas API — no UI framework is needed because the product is a single view with simple state (one image, one set of adjustments). The recommended stack is TypeScript 5.8 + Vite 6.x + Tailwind CSS 4.2 + Cropper.js v2, with the native Canvas 2D API as the rendering foundation. No backend is required.
+WebImager v2.0 adds client-side AI background removal to an existing non-destructive image editor. The research is unambiguous on the core approach: use `@huggingface/transformers` v3.x with the `briaai/RMBG-1.4` (uint8 quantized, ~45MB) model, running exclusively in a Web Worker, with the resulting alpha mask stored as an `ImageBitmap` in Zustand and composited into the existing `renderToCanvas()` pipeline via `globalCompositeOperation: 'destination-in'`. Only one new npm dependency is required. The existing stack (React 19, Vite 6, Zustand 5, Canvas 2D) handles everything else without modification.
 
-The recommended approach is a non-destructive render pipeline: the original uploaded image is stored immutably, and all edits (brightness, contrast, saturation, rotate, crop, filters) are stored as parameters in a central state object. Every state change triggers a single re-render from the original source, applying all parameters as a composite pass. CSS-style `ctx.filter` handles the majority of adjustments with GPU acceleration; pixel manipulation (sharpen) is the exception. This architecture eliminates image quality degradation, enables instant preview, and makes filter presets trivial (they are just parameter snapshots).
+The recommended approach is non-destructive by design: the mask is a render-time parameter, not baked into the source image. This means toggle on/off, rotation, flip, and crop all work correctly without re-running inference. WebImager's competitive angle — fully private, no account, no upload, integrated with editing tools — is genuine and not matched by any server-side competitor. The primary quality limitation (hair on complex backgrounds) is an accepted constraint shared by all free, in-browser tools.
 
-The primary risks are canvas memory limits crashing mobile browsers (iOS Safari's 16.7 megapixel hard limit must be enforced at upload time), main thread blocking during pixel operations on large images (mitigated by defaulting to `ctx.filter` and adding Web Workers only if needed), and the crop coordinate mapping bug (display pixels vs. full-resolution pixels must be explicitly transformed). All three must be designed into the architecture from the first phase — retrofitting them is costly.
+The key risks are all architectural and must be addressed in the first implementation phase: main-thread inference would freeze the UI for 5-30 seconds (non-negotiable: use a Web Worker from day one), JPEG export silently destroys transparency (must white-fill before encode), and mask misalignment with transforms (mask must be stored at source dimensions and transformed identically to the source at render time). All three risks are well-documented with clear prevention strategies. None require novel research — they just require discipline in execution.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The stack is deliberately minimal: Vanilla TypeScript with no UI framework (the single-view tool does not justify framework overhead), Vite 6.x for build tooling, Tailwind CSS 4.2 for utility styling, and Cropper.js v2.1.0 as the only significant third-party dependency (free-drag crop UI is non-trivial to implement correctly). Web Workers and OffscreenCanvas are identified as useful for pixel-heavy operations but are explicitly recommended as optional for v1 — `ctx.filter` covers 80% of adjustment needs with GPU acceleration and no threading complexity. TypeScript 6.0 RC is available but too new; 5.8 is the production-safe choice.
+The only new dependency is `@huggingface/transformers@^3.8.1`. This replaces the deprecated `@xenova/transformers` (v2) and is the official HuggingFace package. It bundles `onnxruntime-web` internally — do not install `onnxruntime-web` separately. Two Vite config changes are required: `optimizeDeps.exclude: ['@huggingface/transformers']` (prevents Vite from breaking WASM loading) and `worker.format: 'es'` (required for dynamic imports in the Web Worker).
+
+`@imgly/background-removal` was evaluated and rejected: AGPL license (viral, problematic for most projects), wraps the same ONNX models with less control, and offers no meaningful advantage. RMBG-2.0 was also evaluated and rejected: blocked by an `onnxruntime-web` bug, 366MB+ quantized model size, and "Unsupported model type" errors in Transformers.js as of March 2026.
 
 **Core technologies:**
-- TypeScript 5.8: Type-safe code, catches Canvas API misuse at compile time — skip 6.0 RC
-- Vite 6.x: Fast builds, native ES modules, zero-config HMR — skip Vite 8 (just released, bleeding-edge)
-- Tailwind CSS 4.2: Utility styling for toolbar, panels, sliders — v4 is CSS-native, no PostCSS
-- Native Canvas 2D API: Core rendering, transforms, filters — GPU-accelerated `ctx.filter` for most operations
-- Cropper.js v2.1.0: Free-drag crop selection — handles touch, aspect ratio, boundaries out of the box
-- Vitest 3.x: Unit testing with native Vite integration
+- `@huggingface/transformers@^3.8.1`: ML inference runtime — only viable option with correct licensing and browser support
+- `briaai/RMBG-1.4` (uint8 quantized): segmentation model — ~45MB, browser-compatible, handles arbitrary subjects (people, products, animals, objects)
+- Web Worker (native browser API): inference isolation — mandatory to prevent main-thread freeze during 2-10 second inference
+- `ImageBitmap`: mask storage format — transferable, GPU-backed, closeable, consistent with existing sourceImage storage
+- `globalCompositeOperation: 'destination-in'`: mask compositing — correct Canvas 2D primitive, avoids premultiplied alpha bugs from putImageData
 
 ### Expected Features
 
-The feature research clearly segments the v1 scope from future work. Everything required for v1 is achievable without a backend, layers, or complex state management.
+The MVP (v2.0) is tightly scoped. Every table-stakes item has clear implementation direction from existing code. Differentiators are identified for v2.x follow-up.
 
-**Must have (table stakes):**
-- Drag-and-drop + file picker upload (JPEG, PNG, WebP, under 10MB) — entry point to the tool
-- Canvas-based real-time preview — the foundation every other feature depends on
-- Resize with dimension inputs and aspect-ratio lock — the #1 reason users visit simple editors
-- Free-drag crop with resizable selection rectangle — the #2 reason
-- Rotate (90-degree increments) and flip (horizontal/vertical) — expected, trivial to implement
-- Brightness, contrast, and saturation sliders — core adjustment trifecta
-- Download as JPEG or PNG with format selection — the exit point
+**Must have (v2.0 table stakes):**
+- One-click "Remove Background" button — single entry point, no configuration before first result
+- Progress indicator during model download and inference — prevents abandonment on first use (~45MB download, 2-10s inference)
+- Transparent background preview with checkerboard — `drawCheckerboard()` already exists in `canvas.ts`
+- Non-destructive mask with "Restore Background" toggle — source image preserved, mask is a render-time parameter
+- PNG export preserving alpha channel — existing PNG download pipeline; verify no alpha flattening in render path
+- JPEG export composited onto white background — must explicitly white-fill before encode; easy to miss, produces black background if omitted
 
-**Should have (competitive differentiators for v1):**
-- Greyscale conversion — one toggle, high utility
-- Preset filters (6-8: sepia, vintage, warm, cool, high-contrast, fade, vivid, B&W) — polish and delight; trivial once adjustment pipeline exists
-- Blur and sharpen with intensity sliders — rare in simple editors; useful for privacy (blur faces)
-- Format conversion on download — users frequently need JPEG-to-PNG conversion
+**Should have (v2.x differentiators):**
+- Solid color background replacement — highest-value differentiator, low effort; product photographers need white backgrounds specifically
+- Edge softness/feathering slider — Gaussian blur on alpha mask, no re-inference required; addresses "cut out with scissors" look
+- Before/after comparison toggle — low effort, good UX polish
+- Model caching verification across browsers — IndexedDB/Cache API persistence, cross-session validation
 
-**Defer (v1.x after validation):**
-- JPEG quality slider on download
-- Common resize presets (social media sizes)
-- Single-level undo / revert to original
-- Keyboard shortcuts
-- Privacy indicator badge ("Your images never leave your device")
+**Defer (v3+):**
+- Multiple model options (quality/speed tradeoff) — UI complexity for marginal gain
+- Background blur/portrait mode — different technique requiring depth estimation, needs separate research
+- WebGPU acceleration as explicit feature — browser support still maturing; Transformers.js auto-detects when available
 
-**Defer (v2+):**
-- Multi-level undo/redo stack, batch processing, touch-optimized mobile editing, EXIF viewer, save/load project state
-
-**Anti-features (deliberately excluded):**
-- Layers, user accounts, AI features, text/annotation, drawing tools, before/after toggle — all conflict with the simplicity and client-side constraints
+**Anti-features (explicitly excluded):**
+- Manual mask painting/brush tool — requires full brush engine, undo stack, layer system; scope explosion
+- Batch background removal — violates single-image workflow constraint
+- Server-side fallback for quality — violates client-side constraint; introduces backend, API keys, privacy concerns
 
 ### Architecture Approach
 
-The architecture is a state-driven render pipeline with four layers: UI components, a central Editor State Manager, Processing Engines (resize, crop, filters, transforms), and a Canvas Abstraction. The key pattern is that the canvas is always a pure projection of `EditorState + sourceImage` — the canvas holds no state itself. All UI interactions update state; state changes trigger a single `requestAnimationFrame`-gated re-render. An overlay canvas handles crop interaction separately so crop handle dragging does not trigger full image re-renders. Export renders the full pipeline at actual output resolution on an offscreen canvas, then uses `canvas.toBlob()` (not `toDataURL`) for download.
+The mask integrates as an optional fourth parameter to `renderToCanvas()`. The pipeline order is: source image → rotation/flip transforms → crop extraction → alpha mask compositing (NEW) → `ctx.filter` adjustments. This order is mandatory: mask must come after transforms/crop (so coordinates align) and before `ctx.filter` (which must operate on opaque pixels to avoid premultiplied alpha color fringing). When both mask and adjustments are active, a second canvas copy-and-redraw pass is required. The Web Worker holds the loaded model in memory between calls, sends pixel data via transferable `ArrayBuffer` (zero-copy), and returns a single-channel mask that the main thread converts to an RGBA `ImageBitmap`.
 
 **Major components:**
-1. File Input / Upload — validate file type (magic bytes), size, and pixel dimensions; apply EXIF orientation correction; load into immutable source image
-2. Canvas Viewport — display-scaled rendering of source image with all current state parameters applied via `ctx.filter` and transforms
-3. Editor State Manager — plain TypeScript object: filter values, crop rect, dimensions, rotation, active tool
-4. Processing Engines — isolated pure functions: filters.ts, transform.ts, resize.ts, crop.ts, render.ts
-5. Crop Overlay — second transparent canvas for interactive selection rectangle; mouse events write crop rect to state
-6. Export Panel — triggers full-resolution offscreen render, `canvas.toBlob()`, object URL download
-
-**Build order:** Canvas pipeline + file I/O first, then state + render loop, then transforms, then adjustments, then presets, then resize, then blur/sharpen, then crop (most complex), then export refinement.
+1. `src/workers/bgRemovalWorker.ts` (NEW) — Transformers.js model loading, inference, progress reporting; model cached in worker memory after first load
+2. `src/hooks/useBgRemoval.ts` (NEW) — worker lifecycle management, store updates, pixel data extraction from sourceImage
+3. `src/utils/canvas.ts` (MODIFIED) — `renderToCanvas()` gains `alphaMask?` parameter; compositing via `destination-in`; second-pass filter handling when mask active
+4. `src/store/editorStore.ts` (MODIFIED) — new `backgroundRemoval` state slice: `{ enabled, mask, status, progress, error }`
+5. `src/components/BackgroundRemovalControls.tsx` (NEW) — remove button, progress bar, restore button, status display
+6. `src/utils/download.ts` (MINOR CHANGE) — white-fill before JPEG encode when mask active
 
 ### Critical Pitfalls
 
-1. **Canvas memory limits crash mobile browsers** — iOS Safari hard-limits canvas to 16.7 megapixels. Enforce pixel dimension check at upload; downscale images exceeding 4096x4096 before drawing to canvas. Must be in Phase 1 (upload pipeline).
+1. **Main-thread inference freezes UI 5-30 seconds** — Non-negotiable: ALL model loading and inference must run in a Web Worker. `await` on WASM execution is not non-blocking on the main thread. Design the Worker first; retrofitting is a near-total rewrite of the integration layer.
 
-2. **Destructive editing pipeline degrades image quality** — Applying effects sequentially to canvas state (not re-rendering from original) causes visible quality loss after a few adjustments. The non-destructive pattern (immutable source + parameter re-render) must be established in Phase 1 before any effects are built. Retrofitting this is HIGH cost.
+2. **JPEG export silently destroys transparency** — The existing DownloadPanel defaults to JPEG. When background removal is active, auto-switch to PNG and/or white-fill before JPEG encode. Add `hasTransparency` awareness to the store. Missing this is the most common user-visible bug.
 
-3. **EXIF orientation causes sideways images** — Phone cameras store raw pixels rotated; `drawImage()` ignores EXIF. Read and apply EXIF orientation at upload time using `createImageBitmap()` with `imageOrientation: 'from-image'` or a minimal EXIF parser. Phase 1.
+3. **Mask misalignment after rotation/flip/crop** — The mask is generated from the source image at its original orientation. It must be drawn with identical transforms applied. Store mask at source dimensions; apply same rotation/flip/crop transforms to mask at render time. Do not apply mask as a post-pipeline step to the final rendered output.
 
-4. **Main thread blocking during pixel operations** — `getImageData`/`putImageData` loops on 4000x3000 images (12M pixels) freeze the UI for 500ms-2s. Mitigate by defaulting to GPU-accelerated `ctx.filter` for all standard adjustments; only use pixel manipulation for sharpen (where canvas filters cannot express convolution). Add Web Workers if performance testing shows jank. Phase 2.
+4. **Canvas premultiplied alpha causes edge fringing** — `ctx.filter` (brightness/contrast) applied to semi-transparent pixels produces color shifts at edges. Apply `ctx.filter` to the opaque source first, then composite the alpha mask. Use `globalCompositeOperation: 'destination-in'`, not `putImageData`, for mask application.
 
-5. **Crop coordinates in display pixels, not source pixels** — The editing canvas is scaled to fit the viewport. Crop selection coordinates must be transformed back to source resolution: `actualX = displayX * (sourceWidth / displayWidth)`. Also account for `window.devicePixelRatio` for sharp HiDPI rendering. Phase 2.
-
-6. **`toDataURL` blocks the browser on large images** — Always use `canvas.toBlob()` for export. It is async and produces binary data (no 33% base64 overhead). Revoke the object URL after download. Phase 3.
+5. **Memory exhaustion on large images** — Source + mask + temp canvas + model weights (~45MB) can reach 400MB+ on a 4000x3000 image, crashing mobile Safari. Call `ImageBitmap.close()` on intermediate bitmaps, downscale input to the model's native resolution (~1024px), release temporary canvases with `canvas.width = 0`.
 
 ## Implications for Roadmap
 
-Based on research, the architecture dictates a strict dependency order. The render pipeline is foundational — nothing else can be built until it exists and is correct. Crop is the most complex UI feature and should be deferred until the pipeline is proven. Export refinement is straightforward once the pipeline is solid.
+### Phase 1: Worker Infrastructure and Model Integration
 
-### Phase 1: Foundation — Upload, Canvas Pipeline, and Non-Destructive Architecture
+**Rationale:** Everything else depends on the Web Worker and model pipeline being correct. The architectural decisions made here — worker message protocol, model caching, progress reporting — are load-bearing for all subsequent phases. Retrofitting a worker around a main-thread implementation is effectively a rewrite of the integration layer.
 
-**Rationale:** Everything depends on this. The non-destructive render pipeline, EXIF orientation handling, and canvas memory limits must be solved before any feature work. Building any effect before the pipeline is correct forces an expensive re-architecture later (HIGH recovery cost per PITFALLS.md).
+**Delivers:** Working background removal in isolation (no UI polish, no edge cases handled). Proves the inference pipeline end-to-end: click → worker → model inference → mask returned → mask stored.
 
-**Delivers:** Working image loader that handles JPEG/PNG/WebP with EXIF correction, displays image on canvas scaled to viewport, and supports download via `canvas.toBlob()`. Basic rotate and flip to prove the transform pipeline. Serves as a skeleton for all subsequent phases.
+**Addresses:** One-click removal, progress indicator, ML model loading and caching
 
-**Addresses:** Drag-and-drop + file picker upload, canvas preview pipeline, rotate/flip, basic download
+**Avoids:** Main-thread blocking (Pitfall 2), model download UX failure (Pitfall 3), WebGPU/WASM backend detection failure (Pitfall 7)
 
-**Avoids:** Canvas memory crashes (pixel dimension check at upload), destructive editing (immutable source + parameter render established from day one), EXIF orientation bugs, toDataURL download anti-pattern
+**Implementation order within phase:**
+1. `npm install @huggingface/transformers` + Vite config changes (`optimizeDeps.exclude`, `worker.format: 'es'`)
+2. `BackgroundRemoval` interface in `types/editor.ts`
+3. `backgroundRemoval` state slice in `editorStore.ts`
+4. `bgRemovalWorker.ts` with model loading, inference, progress messages, WASM backend default
+5. `useBgRemoval.ts` hook with worker lifecycle management
 
-**Research flag:** Standard patterns — well-documented Canvas and FileReader APIs. No deeper research needed.
-
----
-
-### Phase 2: Adjustments and Filtering
-
-**Rationale:** With the render pipeline established and state-driven re-rendering proven, adding adjustment controls is low-risk incremental work. Presets are trivial once adjustments exist (they are parameter snapshots). Blur/sharpen requires the one place pixel manipulation is needed — build after CSS filters are proven to catch any performance issues early.
-
-**Delivers:** Full adjustment panel (brightness, contrast, saturation, greyscale) with real-time preview, 6-8 named filter presets, and blur/sharpen with intensity sliders.
-
-**Addresses:** Brightness/contrast/saturation sliders, greyscale toggle, preset filters, blur/sharpen — all P1 features from FEATURES.md
-
-**Implements:** `ctx.filter` pattern for GPU-accelerated adjustments, preset parameter snapshots, optional Web Worker for sharpen convolution if performance testing shows jank
-
-**Avoids:** Main thread blocking (default to `ctx.filter`; use pixel manipulation only for sharpen), re-applying effects on every slider tick without debouncing
-
-**Research flag:** Standard patterns for `ctx.filter` and convolution kernels. No deeper research needed; consider research-phase only if Web Worker integration proves complex.
+**Research flag:** Standard patterns — well-documented Transformers.js Worker integration with reference implementations from Addy Osmani and Wes Bos. No additional phase research needed.
 
 ---
 
-### Phase 3: Crop and Resize
+### Phase 2: Canvas Pipeline Integration
 
-**Rationale:** Crop is the most complex UI feature (overlay canvas, mouse event math, coordinate mapping, Cropper.js integration). Resize is simpler but shares the coordinate/dimension concerns. Both belong together after the core pipeline is stable. Deferred to Phase 3 because crop bugs (display vs. source coordinates) are much easier to isolate and test once the rest of the pipeline is solid.
+**Rationale:** Mask compositing must be correct before any UI is built on top of it. Getting the render pipeline order wrong (mask before transforms, or after `ctx.filter`) causes visual bugs that are hard to diagnose once UI is layered on top.
 
-**Delivers:** Free-drag crop with Cropper.js (resizable selection rectangle, aspect ratio lock), resize with width/height inputs and aspect ratio lock, correct coordinate mapping from display to full-resolution source pixels.
+**Delivers:** Correct transparent canvas rendering with mask applied through all transform/crop combinations. The "Looks Done But Isn't" checklist items for rotation, crop, and adjustments all pass.
 
-**Addresses:** Free-drag crop (P1 table stakes), resize with aspect lock (P1 table stakes)
+**Addresses:** Transparent background preview, non-destructive mask toggle, alpha channel preservation in the full render pipeline
 
-**Implements:** Overlay canvas pattern for crop interaction, coordinate transformation logic (`actualX = displayX * (sourceWidth / displayWidth)`), `devicePixelRatio` handling for HiDPI
+**Avoids:** Mask/pipeline misalignment (Pitfall 4), canvas premultiplied alpha fringing (Pitfall 5), memory exhaustion (Pitfall 6)
 
-**Avoids:** Crop coordinates using display pixels instead of source pixels, Cropper.js v1 (use v2 ES module native build)
+**Critical verification steps (from PITFALLS.md checklist):**
+- Remove background → rotate 90 → verify mask aligned correctly
+- Remove background → crop → verify transparent areas remain correct
+- Remove background → adjust brightness → verify no color fringing at mask edges
+- Remove background → resize → verify alpha preserved in new ImageBitmap
+- Run on a 4000x3000 image on iOS Safari → verify no tab crash
 
-**Research flag:** Cropper.js v2 API may need a quick research-phase pass — v2 is a significant rewrite from v1 with different initialization and event APIs. Recommend research-phase for Phase 3.
+**Research flag:** Standard Canvas 2D compositing patterns. MDN documentation is authoritative. No additional research needed.
 
 ---
 
-### Phase 4: Export and Polish
+### Phase 3: Export Handling
 
-**Rationale:** Export refinement (format selection, JPEG quality slider, full-resolution offscreen render) is cleanly separable from the editing features. Polish items (privacy indicator, keyboard shortcuts, resize presets, revert-to-original) are low-risk additions that improve quality without changing architecture.
+**Rationale:** Export correctness must be addressed before the feature ships to users. The existing DownloadPanel defaults to JPEG, which silently destroys transparency — the highest-probability user-visible bug. Isolating this as its own phase ensures it gets explicit attention before UI polish begins.
 
-**Delivers:** Download dialog with JPEG/PNG/WebP format selection, JPEG quality slider with estimated file size, full-resolution export via offscreen canvas, revert-to-original button, keyboard shortcuts (Ctrl+Z, Ctrl+S), privacy indicator badge.
+**Delivers:** Correct download behavior for both PNG (alpha preserved) and JPEG (white-filled). Format selector updated with transparency awareness. Users warned or auto-redirected when selecting JPEG with an active mask.
 
-**Addresses:** Format conversion on download (competitive differentiator), JPEG quality slider, revert to original, keyboard shortcuts, privacy indicator — all P2 features from FEATURES.md
+**Addresses:** JPEG export behavior, PNG export alpha preservation, format selector intelligence
 
-**Implements:** Offscreen canvas for export, `canvas.toBlob()` with quality parameter, object URL cleanup
+**Avoids:** JPEG transparency loss (Pitfall 1) — transparent areas producing black background on download
 
-**Avoids:** `toDataURL` for download, missing object URL revocation (memory leaks)
+**Implementation within phase:**
+- `download.ts`: detect `backgroundRemoval.enabled`, white-fill before JPEG encode
+- `DownloadPanel`: auto-switch to PNG when background removed, show JPEG warning if user overrides
+- Verification: download background-removed image as JPEG → confirm white background, not black
 
-**Research flag:** Standard patterns. No deeper research needed.
+**Research flag:** Well-understood JPEG alpha behavior. No additional research needed.
+
+---
+
+### Phase 4: UI and UX Polish
+
+**Rationale:** With correct functionality proven in Phases 1-3, UI can be built confidently without architectural surprises. Building UI before the pipeline is correct leads to throwaway rework.
+
+**Delivers:** `BackgroundRemovalControls` component, progress bar with MB indication, Restore Background button, sidebar integration, model size disclosure on first use
+
+**Addresses:** All v2.0 table-stakes UX requirements — complete the feature for launch
+
+**Avoids:** UX pitfalls from PITFALLS.md: no progress during download, no undo, no completion confirmation, no transparency-aware format guidance
+
+**Research flag:** Standard React component patterns. No additional research needed.
+
+---
+
+### Phase 5: Differentiators (v2.x)
+
+**Rationale:** Delivers competitive advantages after the core feature is stable and validated with real users.
+
+**Delivers:** Solid color background replacement (highest priority), edge softness/feathering slider, before/after comparison toggle
+
+**Addresses:** All "Should have" features from FEATURES.md
+
+**Implementation notes:**
+- Color replacement: composite subject over a filled rectangle; color picker with white/black/grey presets plus custom
+- Edge feathering: Gaussian blur on alpha mask before `destination-in` compositing; no re-inference, pure post-processing
+- Before/after toggle: conditional mask parameter in `renderToCanvas()` call — already built into the render pipeline
+
+**Research flag:** Standard patterns. No additional research needed.
 
 ---
 
 ### Phase Ordering Rationale
 
-- **Pipeline before features:** PITFALLS.md makes clear that a destructive editing architecture has HIGH recovery cost. Establishing the non-destructive render pipeline in Phase 1 is non-negotiable.
-- **Adjustments before crop:** Adjustments (Phase 2) validate the state-driven re-render loop before adding the complexity of crop interaction. Crop (Phase 3) depends on a proven pipeline.
-- **Crop last among core features:** ARCHITECTURE.md explicitly lists crop as the most complex interaction and recommends building it last. PITFALLS.md adds the coordinate mapping bug as a crop-specific concern.
-- **Export separate:** Export is a clean capstone that reads the completed pipeline and adds download UX. No architectural dependencies on crop or adjustments implementation details.
+- **Worker before canvas pipeline:** The worker message protocol determines what data the canvas pipeline receives. Designing the pipeline before the worker means refactoring the worker API to match pipeline requirements discovered later.
+- **Canvas pipeline before UI:** UI components bind to store state and the pipeline's data shapes. Building UI first causes frequent API churn as the pipeline evolves.
+- **Export before polish:** A feature that silently corrupts downloads is a correctness bug, not a polish gap. Export correctness ships with the feature, not after.
+- **Differentiators last:** All differentiators (color replacement, feathering, before/after toggle) are additive operations that depend on having a correct alpha mask. None affect the core pipeline.
 
 ### Research Flags
 
 Needs `/gsd:research-phase` during planning:
-- **Phase 3 (Crop):** Cropper.js v2 is a significant rewrite from v1. The initialization API, event model, and ES module integration differ from most existing tutorials. A focused research pass on Cropper.js v2 docs will prevent integration surprises.
+- **None identified.** All phases use well-documented browser APIs and Transformers.js patterns. Reference implementations exist and have HIGH-confidence sources.
 
-Standard patterns (skip research-phase):
-- **Phase 1 (Foundation):** Canvas API, FileReader, createImageBitmap, EXIF orientation — all well-documented on MDN with established patterns.
-- **Phase 2 (Adjustments):** `ctx.filter` CSS filter string, requestAnimationFrame debouncing, convolution kernel for sharpen — well-documented patterns with multiple code examples in research.
-- **Phase 4 (Export):** `canvas.toBlob()`, object URLs, offscreen canvas for export — straightforward APIs with clear documentation.
+Standard patterns (research-phase not needed):
+- **Phase 1:** Transformers.js Web Worker integration is documented with working reference implementations (Addy Osmani, Wes Bos, LogRocket)
+- **Phase 2:** Canvas 2D `globalCompositeOperation` is authoritative MDN-documented behavior
+- **Phase 3:** JPEG alpha flattening is a known browser behavior with a standard white-fill solution
+- **Phase 4:** React progress/loading component patterns are standard
+- **Phase 5:** Gaussian blur on ImageData and canvas color fill are basic Canvas 2D operations
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Technology choices verified against current npm versions, official release notes, and MDN. Version recommendations are specific and justified. |
-| Features | HIGH | Competitor analysis covered 6+ live editors. Feature prioritization is grounded in observed industry patterns for simple editors. |
-| Architecture | HIGH | Render pipeline pattern sourced from MDN, web.dev, and Smashing Magazine. Canvas filter vs. pixel manipulation tradeoffs are well-established. Code examples are concrete and tested patterns. |
-| Pitfalls | HIGH | Pitfalls are specific with iOS Safari memory limits cited from PQINA's documented browser testing. Recovery costs are assessed honestly. |
+| Stack | HIGH | Single recommended library with clear rationale; alternatives explicitly evaluated and rejected with documented reasons (GitHub issues, npm audits, license review) |
+| Features | HIGH | Table stakes established from competitor analysis (remove.bg, Photoroom, Canva); differentiators are concrete and implementation-defined with cost/value estimates |
+| Architecture | HIGH | Existing codebase architecture well-understood; pipeline integration points are specified to the function-signature level with code examples |
+| Pitfalls | HIGH | Pitfalls sourced from GitHub issues, production post-mortems, and reference implementations; all have concrete prevention strategies and recovery cost estimates |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Web Worker necessity for sharpen:** Research recommends starting without workers and adding them if performance testing shows jank on large images. The decision point ("how laggy is too laggy for sharpen?") needs a concrete threshold defined during Phase 2 planning (e.g., "if sharpen on a 4000x3000 image takes >200ms, add a Worker").
-- **Mobile crop touch UX:** PITFALLS.md flags that crop handles need 44x44px touch targets and edge dragging (not just corner) for mobile. Cropper.js v2 may handle this natively — verify during Phase 3 research.
-- **JPEG quality default:** Research recommends 0.85-0.92 as a good quality range for JPEG export but does not specify a single default. Pick 0.90 as the default and validate with user testing once the tool is live.
-- **OffscreenCanvas browser support edge cases:** Safari has had historical quirks with OffscreenCanvas. If Web Workers are added for sharpen in Phase 2, test on Safari and have a main-thread fallback ready.
+- **RMBG-1.4 licensing for commercial use:** The model uses a Creative Commons non-commercial license. Acceptable for a free static site. If WebImager ever monetizes, the model must be replaced with `Xenova/modnet` (MIT) or a commercially-licensed alternative. Flag this if commercialization is ever on the roadmap.
+
+- **Mobile inference performance on mid-range Android:** Research characterizes WASM inference as 5-30 seconds. Actual performance on mid-range Android (not just desktop or iOS) is not precisely characterized. The progress bar and patience messaging are essential safeguards. Validate during Phase 1 testing on real devices.
+
+- **Browser Cache API eviction for model caching:** Transformers.js uses the Cache API, which is subject to browser eviction under storage pressure. Research confirms caching works but does not quantify eviction likelihood in practice. Consider surfacing a "model downloaded" indicator so users understand why an occasional re-download occurs.
+
+- **`applyResize` alpha preservation:** PITFALLS.md flags that `applyResize` creates a new `ImageBitmap` which may flatten alpha. The mask invalidation rules (resize clears mask) contain this risk, but the actual `applyResize` implementation should be verified during Phase 2 to confirm it does not silently produce an opaque ImageBitmap.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- [MDN Canvas API](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API) — Canvas 2D context, filters, pixel manipulation, OffscreenCanvas
-- [MDN CanvasRenderingContext2D: filter property](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/filter) — CSS-style GPU-accelerated filters
-- [Cropper.js npm](https://www.npmjs.com/package/cropperjs) — v2.1.0 package details, last published ~4 months ago
-- [Cropper.js docs](https://fengyuanchen.github.io/cropperjs/) — API reference for v2
-- [Tailwind CSS v4.2](https://tailwindcss.com/blog/tailwindcss-v4) — Feb 2026 stable release
-- [TypeScript 6.0 RC announcement](https://devblogs.microsoft.com/typescript/announcing-typescript-6-0-rc/) — confirms 5.8 as production choice
-- [PQINA: Total Canvas Memory Use Exceeds The Maximum Limit](https://pqina.nl/blog/total-canvas-memory-use-exceeds-the-maximum-limit/) — iOS Safari canvas limits
-- [web.dev: OffscreenCanvas](https://web.dev/articles/offscreen-canvas) — Worker-based canvas rendering
+- [@huggingface/transformers on npm](https://www.npmjs.com/package/@huggingface/transformers) — v3.8.1, library API reference
+- [Transformers.js v3 announcement](https://huggingface.co/blog/transformersjs-v3) — WebGPU support, `@huggingface/transformers` package name
+- [RMBG-1.4 Model Card](https://huggingface.co/briaai/RMBG-1.4) — model capabilities, quantization options, license
+- [RMBG-2.0 onnxruntime-web bug](https://github.com/microsoft/onnxruntime/issues/21968) — why RMBG-2.0 is not viable in-browser
+- [RMBG-2.0 Transformers.js issue](https://github.com/huggingface/transformers.js/issues/1107) — "Unsupported model type" error documentation
+- [Canvas globalCompositeOperation MDN](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/globalCompositeOperation) — compositing operation behavior
+- [Optimizing Transformers.js for Production - SitePoint](https://www.sitepoint.com/optimizing-transformers-js-production/) — Vite config patterns, `optimizeDeps.exclude` requirement
 
 ### Secondary (MEDIUM confidence)
-- [Cloudinary: JavaScript Image Editor Guide 2026](https://cloudinary.com/guides/image-effects/javascript-image-editor) — ecosystem overview
-- [IMG.LY: Top 5 JS Image Manipulation Libraries](https://img.ly/blog/the-top-5-open-source-javascript-image-manipulation-libraries/) — library comparison
-- [Smashing Magazine: Web Image Effects Performance Showdown](https://www.smashingmagazine.com/2016/05/web-image-effects-performance-showdown/) — ctx.filter vs. pixel manipulation benchmarks (2016, patterns still valid)
-- Competitor analysis: Photopea, Pixlr, ImgModify, PicResize, BeFunky — live editor feature audit
-
-### Tertiary (LOW confidence)
-- [file-saver npm](https://www.npmjs.com/package/file-saver) — may not be needed; `<a download>` is sufficient for most browsers
-- [browser-image-compression npm](https://www.npmjs.com/package/browser-image-compression) — nice-to-have for v1.x quality slider
+- [Addy Osmani's bg-remove](https://github.com/addyosmani/bg-remove) — React + Transformers.js reference implementation
+- [Wes Bos bg-remover](https://github.com/wesbos/bg-remover) — additional reference implementation
+- [LogRocket: Background remover with Vue and Transformers.js](https://blog.logrocket.com/building-background-remover-vue-transformers-js/) — Worker architecture patterns
+- [Canvas premultiplied alpha - DEV Community](https://dev.to/yoya/canvas-getimagedata-premultiplied-alpha-150b) — alpha fringing cause and explanation
+- [ONNX Runtime Web WASM memory limits](https://github.com/microsoft/onnxruntime/issues/10957) — memory exhaustion characterization on mobile
+- [BRIA RMBG-2.0 benchmarks](https://blog.bria.ai/benchmarking-blog/brias-new-state-of-the-art-remove-background-2.0-outperforms-the-competition) — 90% vs 74% accuracy comparison (quantifying RMBG-1.4 quality tradeoff)
+- [IMG.LY: 20x Faster Browser Background Removal with ONNX Runtime](https://img.ly/blog/browser-background-removal-using-onnx-runtime-webgpu/) — WebGPU performance benchmarks, competitor feature context
 
 ---
-*Research completed: 2026-03-13*
+*Research completed: 2026-03-14*
 *Ready for roadmap: yes*

@@ -1,157 +1,191 @@
 # Pitfalls Research
 
-**Domain:** Browser-based client-side image editor
-**Researched:** 2026-03-13
+**Domain:** In-browser AI background removal added to existing canvas-based image editor
+**Researched:** 2026-03-14
 **Confidence:** HIGH
 
 ## Critical Pitfalls
 
-### Pitfall 1: Canvas Memory Limits Crash Mobile Browsers
+### Pitfall 1: JPEG Export Destroys Transparency (Black/White Background Instead of Transparent)
 
 **What goes wrong:**
-iOS Safari enforces a hard canvas area limit of 16,777,216 pixels (width x height) per canvas and a total canvas memory budget of ~384MB across all canvases. A 10MB JPEG photo from a modern phone camera can easily be 4000x6000 pixels (24 megapixels) -- well over the 16.7 megapixel limit. When exceeded, Safari silently renders transparent/black canvases or crashes the tab. Desktop browsers are more lenient but still have limits.
+After removing the background, the canvas contains pixels with alpha=0 (transparent). The user downloads as JPEG -- which does not support alpha channels -- and gets a black or white background instead of the transparent result they expected. The current DownloadPanel defaults to JPEG format, so this will bite most users immediately.
 
 **Why it happens:**
-Developers test on desktop with smaller images and never hit the limit. The 10MB file size limit in PROJECT.md does not correlate with pixel dimensions -- a highly compressed 10MB JPEG can be 8000x6000 pixels.
+The existing download pipeline (`downloadImage` in `utils/download.ts`) passes the format directly to `canvas.toBlob()`. JPEG encoding flattens alpha to opaque, and browsers fill transparent regions with black by default. The current code has no awareness of whether the image contains transparency.
 
 **How to avoid:**
-- On image load, read the actual pixel dimensions (naturalWidth/naturalHeight) before drawing to canvas
-- If width x height exceeds a safe threshold (e.g., 4096x4096 = 16.7M pixels), downscale the image proportionally before putting it on canvas
-- Track total canvas memory usage if using multiple canvases (preview, crop overlay, etc.)
-- Use `canvas.width = 0; canvas.height = 0;` to explicitly release canvas memory when done
+- When background removal is active, auto-switch the download format to PNG and disable or warn on JPEG selection
+- If the user insists on JPEG, composite the transparent image onto a white canvas before encoding (`ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h)` before `drawImage`)
+- Add a `hasTransparency` flag to the editor store that tracks whether background removal has been applied
+- Update the DownloadPanel to show a warning: "JPEG does not support transparency. Transparent areas will appear white."
 
 **Warning signs:**
-- Testing only with small/medium images during development
-- Multiple canvas elements created without cleanup
-- No dimension validation on upload
-- Users reporting blank/black images on mobile
+- DownloadPanel defaults to JPEG with no format intelligence
+- No store state tracking whether the image has transparency
+- No pre-fill of white background before JPEG export
+- Users reporting "black background" on downloaded images
 
 **Phase to address:**
-Phase 1 (image upload/display). Dimension validation and downscaling must be baked into the upload pipeline from day one.
+Export/download integration phase. Must be implemented alongside or immediately after the background removal feature, not deferred.
 
 ---
 
-### Pitfall 2: Main Thread Blocking During Pixel Operations
+### Pitfall 2: ML Inference Blocks the Main Thread, Freezing the UI for 5-30 Seconds
 
 **What goes wrong:**
-Canvas `getImageData` and `putImageData` are synchronous operations. Applying effects like brightness, contrast, greyscale, or blur requires iterating over every pixel. On a 4000x3000 image (12 million pixels, 48 million RGBA values), this freezes the UI for 500ms-2s. Users think the app is broken, and the browser may show a "page unresponsive" dialog.
+Running the segmentation model (RMBG-1.4 or similar, ~40M parameters) on the main thread freezes the entire browser tab. The user clicks "Remove Background," the UI becomes completely unresponsive for 5-30 seconds depending on image size and device. No spinner, no progress, no cancel. On mobile, the browser may show "Page Unresponsive" and offer to kill the tab.
 
 **Why it happens:**
-The naive approach -- get pixels, loop, put pixels -- works perfectly on small test images. The problem only surfaces at real-world image sizes. Developers often ship this because "it works on my machine" with their 800x600 test image.
+The simplest Transformers.js integration runs `pipeline('image-segmentation', model)` directly in the component or an async function. While the model inference is technically asynchronous at the ONNX level, the WASM execution still heavily blocks the main thread. Developers see `await` and assume it is non-blocking -- it is not.
 
 **How to avoid:**
-- Use OffscreenCanvas with Web Workers for all pixel manipulation (greyscale, brightness, contrast, blur, sharpen, filters)
-- Fall back to chunked processing with requestAnimationFrame if OffscreenCanvas is not supported
-- Show a loading indicator during any operation that takes >100ms
-- For slider-driven adjustments (brightness, contrast), debounce or throttle the processing -- do not re-process on every input event
+- Run ALL model loading and inference inside a dedicated Web Worker
+- Use `postMessage` with transferable objects (`ImageData.data.buffer`) to avoid copying pixel data between threads
+- Set `env.backends.onnx.wasm.proxy = true` in Transformers.js to proxy WASM execution to a worker thread automatically
+- Show an immediate loading state with a progress indicator before inference starts
+- Consider a cancel mechanism (terminate the worker and spawn a new one)
 
 **Warning signs:**
-- No loading/progress indicators in the UI
-- Slider adjustments feel laggy or jerky
-- Processing functions are called directly in event handlers without debouncing
-- No Web Worker architecture in the codebase
+- No Web Worker file in the project
+- Model inference called directly in React components or Zustand actions
+- No loading/progress UI for background removal
+- `env.backends.onnx.wasm.proxy` not set to `true`
 
 **Phase to address:**
-Phase 2 (effects/adjustments). The architecture decision for where processing runs must be made before building any effects. Retrofitting Workers is painful.
+Core architecture phase -- the worker infrastructure must be designed before integrating the model. Retrofitting a worker around a main-thread implementation is a near-total rewrite of the integration code.
 
 ---
 
-### Pitfall 3: Destructive Editing Pipeline Ruins Image Quality
+### Pitfall 3: Model Download is 30-90MB and Has No Progress Feedback or Caching Strategy
 
 **What goes wrong:**
-Each time you draw an image to canvas, apply an effect, and read it back, you lose quality. JPEG re-encoding at each step compounds artifacts. Applying brightness, then contrast, then saturation as three sequential canvas draws degrades the image noticeably. Users end up with blurry, artifact-laden results.
+The ONNX model file for background removal is typically 30-90MB (RMBG-1.4 quantized is ~30MB, full precision ~90MB). On first use, this downloads with no progress indication. The user clicks "Remove Background," waits 10-45 seconds with no feedback, thinks the app is broken, and closes the tab -- aborting the download. On subsequent visits, the model may re-download if caching is not configured.
 
 **Why it happens:**
-The simplest implementation applies each effect to the current canvas state. This is destructive -- each step uses the already-modified pixels as input. After 3-4 operations, quality loss is visible.
+Transformers.js uses the browser Cache API internally, but developers do not realize: (1) the initial download needs explicit progress feedback, (2) the cache can be evicted by the browser under storage pressure, and (3) the model must be served with correct `Cache-Control` headers if self-hosted.
 
 **How to avoid:**
-- Always keep the original uploaded image data in memory (as an ImageBitmap or cached ImageData)
-- Apply all current effects as a single composite operation from the original source, never chain effect-on-effect
-- Store effects as a parameter object (e.g., `{ brightness: 10, contrast: 5, greyscale: false }`) and re-render from original each time any parameter changes
-- Only encode to JPEG/PNG once, at final download time
+- Show a progress bar during model download with estimated size ("Downloading AI model... 12MB / 30MB")
+- Transformers.js provides download progress callbacks -- use `progress_callback` in the pipeline options
+- Pre-populate the cache on user opt-in ("Enable AI features" button that triggers the download proactively)
+- If self-hosting model files, set `Cache-Control: public, max-age=31536000, immutable` headers
+- Consider using a quantized (int8) model variant to reduce download from ~90MB to ~30MB
+- Show "Model cached" vs "First download required" in the UI
 
 **Warning signs:**
-- No reference to original image data after initial load
-- Effects applied sequentially to canvas state
-- Image quality visibly degrades after multiple adjustments
-- No "reset" functionality or it requires re-uploading the image
+- No progress callback wired up during model loading
+- No visual feedback between clicking "Remove Background" and getting a result
+- Model re-downloads on page reload (check Network tab)
+- No consideration of model file hosting (CDN, self-hosted, or Hugging Face default)
 
 **Phase to address:**
-Phase 1 (architecture). The non-destructive pipeline pattern must be established before any effects are built. This is an architectural decision, not a feature decision.
+Model integration phase. Progress feedback and caching must be part of the initial model loading implementation, not an afterthought.
 
 ---
 
-### Pitfall 4: EXIF Orientation Causes Rotated/Flipped Images
+### Pitfall 4: Alpha Mask Applied Incorrectly to Existing Non-Destructive Pipeline
 
 **What goes wrong:**
-Phone cameras store photos with EXIF orientation metadata. The actual pixel data may be rotated 90/180/270 degrees, with the EXIF tag telling viewers how to display it. When you draw this image to canvas, the canvas ignores EXIF data and shows the raw pixel orientation. Users see their portrait photo sideways.
+The current pipeline (`renderToCanvas` in `utils/canvas.ts`) renders transforms and adjustments from the source `ImageBitmap`. Background removal produces a mask/alpha channel that must be composited. If the mask is applied at the wrong stage (before rotation, after crop, etc.), the mask and image become misaligned. The mask corresponds to the source image dimensions and orientation -- if transforms are applied to the image but not the mask, the background bleeds through or the foreground gets clipped.
 
 **Why it happens:**
-Modern browsers (Chrome 81+, Firefox 78+, Safari 13.1+) now auto-correct orientation when rendering `<img>` elements, so developers may not notice the issue when displaying the uploaded image. But canvas `drawImage()` and `createImageBitmap()` behavior varies -- some browsers respect EXIF, some do not, and the behavior has changed across versions.
+The existing pipeline operates on `ImageBitmap` with transforms as parameters. The segmentation model outputs a mask for the un-transformed source image. Developers apply the mask to the final rendered output, but the mask coordinates correspond to the pre-transform source. Rotation, flip, and crop all change the spatial relationship between mask and image.
 
 **How to avoid:**
-- Use `createImageBitmap(file, { imageOrientation: 'flipY' })` or the newer `imageOrientation: 'from-image'` option where supported
-- Read EXIF orientation from the file before drawing (libraries like exif-js or a minimal EXIF parser)
-- Apply the correct rotation/flip transform on the canvas before the first drawImage call
-- Test with actual phone photos, not just test images from a computer
+- Apply the mask to the source image BEFORE the render pipeline processes transforms -- create a new `ImageBitmap` with the background already removed, then let the existing pipeline handle rotation/flip/crop as usual
+- Store `backgroundRemovedImage: ImageBitmap | null` in the Zustand store alongside `sourceImage`
+- When background removal is active, the render pipeline uses `backgroundRemovedImage` instead of `sourceImage` as its input
+- This approach requires zero changes to the existing `renderToCanvas` function
 
 **Warning signs:**
-- Testing only with screenshots or web-downloaded images (these typically have no EXIF orientation)
-- No EXIF handling code in the upload pipeline
-- User reports of sideways or mirrored images, especially from iPhones
+- Mask applied as a post-processing step after `renderToCanvas`
+- Mask coordinates not transforming with rotation/flip
+- Transparent "holes" appear in wrong places after rotating a background-removed image
+- Alpha artifacts along edges after cropping
 
 **Phase to address:**
-Phase 1 (image upload). Must be solved at upload time before any processing occurs.
+Core integration phase. The architectural decision of WHERE in the pipeline the mask is applied determines the complexity of everything else.
 
 ---
 
-### Pitfall 5: toDataURL for Download Blocks UI and Fails on Large Images
+### Pitfall 5: Canvas Premultiplied Alpha Causes Edge Fringing Artifacts
 
 **What goes wrong:**
-`canvas.toDataURL()` is synchronous, encodes the entire image as a base64 string (33% larger than binary), and can exceed browser URL length limits for large images. On a 4000x3000 canvas, this creates a ~48MB base64 string synchronously, freezing the browser for seconds. On some mobile browsers it simply fails silently.
+After applying the segmentation mask, the edges of the foreground subject show white or dark fringing -- a visible "halo" of semi-transparent pixels that look wrong against the checkerboard or any new background. This is especially noticeable on hair, fur, and other fine details.
 
 **Why it happens:**
-Every "download canvas as image" tutorial uses toDataURL because it is simple. It works fine for small canvases. Developers copy-paste this pattern without understanding the scaling characteristics.
+Canvas 2D uses premultiplied alpha internally. When you use `putImageData` with semi-transparent pixels, the browser premultiplies RGB by alpha. When the canvas is then composited (drawn onto another canvas, exported, or displayed over the CSS checkerboard), the premultiplication creates fringing. Additionally, `ctx.filter` (used for brightness/contrast) applied to semi-transparent pixels produces different results than applying filters to the opaque original -- the filter operates on premultiplied values, causing color shifts at transparent edges.
 
 **How to avoid:**
-- Use `canvas.toBlob()` instead -- it is asynchronous and produces binary data (no 33% base64 overhead)
-- Create a download link with `URL.createObjectURL(blob)` and programmatically click it
-- Revoke the object URL after download to free memory: `URL.revokeObjectURL(url)`
-- Specify JPEG quality parameter (0.85-0.92 is a good range) to control output file size
+- Apply `ctx.filter` adjustments (brightness, contrast, saturation) to the image BEFORE applying the alpha mask, not after. The current pipeline does this correctly if the mask is baked into a separate `ImageBitmap` -- `ctx.filter` on a fully opaque source produces correct results, then the alpha from the mask is composited afterward
+- Use `globalCompositeOperation = 'destination-in'` to apply the mask rather than manual pixel manipulation -- this avoids the putImageData premultiplication issue
+- For edge refinement, apply a 1-2px feather to the mask to smooth the alpha transition and reduce hard fringing
+- Test with dark-haired subjects on light backgrounds and light-haired subjects on dark backgrounds -- these expose fringing most visibly
 
 **Warning signs:**
-- Any usage of `toDataURL()` in the codebase for download functionality
-- No quality parameter specified when exporting JPEG
-- Download functionality not tested with large (3000+ pixel) images
-- No object URL cleanup (memory leaks from accumulated blobs)
+- White or dark "halo" around the subject edges
+- Edge quality looks worse after applying brightness/contrast adjustments
+- Manual `putImageData`/`getImageData` loops used for mask application instead of compositing operations
+- No feathering or edge refinement on the mask
 
 **Phase to address:**
-Phase 3 (download/export). Use toBlob from the start; do not implement toDataURL and plan to "fix it later."
+Mask compositing phase. Edge quality is the primary quality differentiator between "demo-grade" and "production-grade" background removal.
 
 ---
 
-### Pitfall 6: Crop Selection Does Not Account for Display vs. Actual Dimensions
+### Pitfall 6: Memory Exhaustion from Multiple Large Bitmaps
 
 **What goes wrong:**
-The image displayed in the editor is scaled to fit the viewport (e.g., a 4000x3000 image shown at 800x600 CSS pixels). The crop selection rectangle is drawn in display coordinates. When the crop is applied, developers use display coordinates directly, producing a tiny cropped image (800x600 max) instead of mapping back to the full-resolution original.
+Background removal requires holding multiple large data structures simultaneously: the source `ImageBitmap`, the segmentation mask, a temporary canvas for mask application, and the resulting background-removed `ImageBitmap`. For a 4000x3000 image, each uncompressed bitmap is ~48MB (4000 * 3000 * 4 bytes RGBA). With source + mask + temp canvas + result, peak memory usage hits ~200MB for a single operation. On mobile Safari (with ~300MB canvas memory budget), this crashes the tab.
 
 **Why it happens:**
-The coordinate mapping between display size and actual image size is not obvious. On non-Retina displays, the developer may not notice because display and canvas pixels are 1:1 at the scale they tested.
+Developers do not track the lifecycle of intermediate bitmaps and canvases. The model itself also consumes 100-200MB of WASM heap memory. Combined with the image data, total memory can hit 400MB+, well beyond mobile browser limits.
 
 **How to avoid:**
-- Maintain a clear ratio between display dimensions and source image dimensions
-- All crop coordinates must be transformed: `actualX = displayX * (sourceWidth / displayWidth)`
-- On HiDPI/Retina displays, account for `window.devicePixelRatio` -- the canvas backing store should be `displayWidth * devicePixelRatio` to avoid blurry rendering
-- Test crop output dimensions against expected values with images of known size
+- Close intermediate `ImageBitmap` objects immediately after use with `.close()` -- the existing codebase already does this for `sourceImage` swaps, so follow the same pattern
+- Use `canvas.width = 0; canvas.height = 0` to release temporary canvas memory
+- Downscale oversized images before feeding them to the model -- most segmentation models accept 1024x1024 or 512x512 input anyway, so downscaling is both a memory optimization and a model requirement
+- Run the model on a downscaled version, then upscale the mask back to original dimensions for application
+- Set `canvas.width = 0` on temporary canvases created during mask application
+- Consider `ImageBitmap.close()` on the pre-removal source if the user confirms they want to keep the result
 
 **Warning signs:**
-- Cropped images are always small regardless of source image size
-- Crop looks correct in preview but output is blurry or wrong size
-- No coordinate transformation logic in crop implementation
-- No devicePixelRatio handling anywhere in the codebase
+- No `.close()` calls on intermediate ImageBitmap objects
+- Temporary canvases created but never cleaned up
+- Full-resolution image passed directly to the model (unnecessary; models resize internally anyway)
+- Memory usage climbs with each "remove background" attempt (check browser task manager)
+- Mobile users reporting tab crashes during background removal
 
 **Phase to address:**
-Phase 2 (crop feature). Coordinate mapping must be designed before implementing the crop UI.
+Core integration phase. Memory management must be designed into the mask-application pipeline from the start.
+
+---
+
+### Pitfall 7: WebGPU/WASM Backend Detection and Fallback Handled Incorrectly
+
+**What goes wrong:**
+The app tries to use WebGPU for faster inference but crashes or silently fails on browsers/devices that do not support it (Safari as of early 2026, older Chrome, all Firefox). The developer tests on Chrome with WebGPU and ships, then users on Safari get a blank result, an error, or infinite loading.
+
+**Why it happens:**
+WebGPU support is still not universal. Checking `navigator.gpu` is not sufficient -- the adapter may be null, or the device may lack required features. Transformers.js may fall back to WASM automatically, but the fallback behavior is not always reliable, and the performance characteristics change dramatically (WebGPU: 1-3s inference, WASM: 5-30s inference).
+
+**How to avoid:**
+- Default to WASM backend, which works everywhere -- do not default to WebGPU
+- If using WebGPU as an optimization, wrap in a try/catch with explicit fallback: attempt WebGPU, on failure fall back to WASM
+- Test on Safari (no WebGPU), Firefox (no WebGPU), Chrome (WebGPU available), and mobile Safari
+- Adjust the loading/progress UI to account for WASM being 3-10x slower than WebGPU
+- Set `device: 'cpu'` (WASM) as default in Transformers.js pipeline options, not `device: 'webgpu'`
+
+**Warning signs:**
+- `device: 'webgpu'` hardcoded without fallback
+- No try/catch around model initialization
+- Only tested on Chrome desktop
+- No error handling for model loading failures
+- Different behavior on Safari vs Chrome with no explanation
+
+**Phase to address:**
+Model integration phase. Backend selection and fallback must be part of the initial model loading setup.
 
 ---
 
@@ -159,89 +193,97 @@ Phase 2 (crop feature). Coordinate mapping must be designed before implementing 
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Processing on main thread | Simpler code, no Worker setup | UI freezes on large images, unusable on mobile | Never for production; acceptable only for initial proof-of-concept |
-| Storing full canvas snapshots for undo | Simple implementation | Memory explodes: each snapshot of a 4000x3000 image is ~48MB | Never -- store effect parameters instead |
-| Using CSS filters for preview | GPU-accelerated, instant | Cannot extract CSS-filtered result to download; must re-implement in canvas for export | Acceptable if you also implement canvas-based processing for export |
-| Hardcoded canvas dimensions | Quick setup | Breaks on different screen sizes, fails on mobile | Never |
-| Single canvas for everything | Less DOM, simpler code | Redraws everything on every interaction (crop handle drag = full re-render) | MVP only; separate into layers before adding interactive features |
+| Running model inference on main thread | No Web Worker setup needed | Freezes UI for 5-30s, unusable on mobile, no cancel capability | Never -- even for MVP, the worker is essential |
+| Storing mask as separate canvas layer | Simpler initial implementation | Extra memory, compositing bugs with transforms, double-draw on every render | MVP only; replace with baked ImageBitmap before shipping |
+| Loading full-precision model | Slightly better edge quality | 90MB download vs 30MB, 3x memory usage, longer inference | Never for browser use -- quantized models are the standard |
+| Applying mask after render pipeline | No changes to existing renderToCanvas | Mask misaligns with rotation/flip/crop, edge artifacts with ctx.filter | Never -- apply mask to source before pipeline |
+| Hardcoding model URL to Hugging Face CDN | No asset hosting needed | Depends on third-party uptime, no cache control, CORS issues on some deployments | Acceptable for development; self-host for production |
+
+## Integration Gotchas
+
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| Transformers.js + Vite | Vite tries to optimize/bundle the ONNX Runtime WASM files, causing 404s or corrupt WASM | Exclude `@huggingface/transformers` and `onnxruntime-web` from Vite's `optimizeDeps`; configure `assetsInclude` for `.wasm` files; or use the CDN-hosted WASM files |
+| Web Worker + Vite | Worker import paths break in production builds | Use Vite's `new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })` syntax for correct bundling |
+| Segmentation output + Canvas | Model outputs a grayscale mask or raw tensor, not an alpha-ready ImageData | Convert model output to a proper alpha mask: map mask values (0.0-1.0) to alpha channel (0-255), set RGB to the source image pixels |
+| `ctx.filter` + transparency | Brightness/contrast filters on semi-transparent pixels produce incorrect colors | Apply filters to the opaque source image first, then composite the mask afterward |
+| `ImageBitmap` + Web Worker | `ImageBitmap` created in worker cannot be drawn to main-thread canvas in some browsers | Transfer the `ImageBitmap` back to main thread via `postMessage` with transferable list; or transfer raw `ImageData` and create bitmap on main thread |
 
 ## Performance Traps
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Re-applying all effects on every slider tick | Slider feels laggy, CPU pegged at 100% | Debounce slider input (50-100ms), use requestAnimationFrame | Images > 2 megapixels |
-| Creating new ImageData on every effect call | Garbage collection pauses, memory spikes | Reuse a single ImageData buffer, write back to it | Images > 1 megapixel with rapid adjustments |
-| Multiple canvas redraws per frame | Flickering, dropped frames, high GPU usage | Batch all changes into a single requestAnimationFrame callback | Any interactive operation (drag, slider) |
-| Loading full-resolution image into preview | Slow initial render, excessive memory | Generate a display-sized preview; process full-res only at export | Source images > 3000px in either dimension |
-| Not releasing object URLs | Memory leaks accumulate over session | Call URL.revokeObjectURL() after use | After 5-10 export/download operations |
-
-## Security Mistakes
-
-| Mistake | Risk | Prevention |
-|---------|------|------------|
-| Not validating file type beyond extension | User uploads a malicious HTML file renamed to .jpg; if served back, XSS risk | Validate MIME type via file header bytes (magic numbers), not just file extension or `file.type` |
-| Trusting client-side file size check alone | Browser memory exhaustion with extremely large images | Validate both file size AND pixel dimensions after decoding |
-| Using innerHTML to display file metadata | XSS via crafted EXIF data containing script tags | Use textContent for any user/file-derived strings displayed in UI |
+| Feeding full-resolution image to model | 30s+ inference time, high memory | Downscale to model's native input size (typically 1024x1024), upscale mask back | Images > 2 megapixels |
+| Re-running inference on every adjustment | Seconds-long delay on each brightness/contrast change | Cache the mask; only re-run inference when source image changes, not when adjustments change | Any adjustment slider interaction |
+| Loading model eagerly on page load | 30-90MB download before user even needs it, wasted bandwidth | Lazy-load model on first "Remove Background" click; show download progress | Always -- most users may never use background removal |
+| Not disposing ONNX session | WASM heap memory (~100-200MB) never freed | Call `session.release()` or let Transformers.js handle cleanup after inference; consider disposing when user loads a new image | After 2-3 background removal operations |
+| Transferring ImageData by copy instead of transfer | Double memory spike (data exists in both threads briefly) | Use `postMessage(data, [data.buffer])` to transfer ownership, not copy | Images > 3 megapixels |
 
 ## UX Pitfalls
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| No progress feedback during processing | User clicks button, nothing happens, clicks again, queues duplicate work | Show spinner/progress bar immediately; disable controls during processing |
-| Crop handle too small for touch | Mobile users cannot grab crop corners/edges | Make crop handles at least 44x44px touch target; add edge dragging, not just corner |
-| No visual feedback when image is processing | Users think app is frozen | Dim the image or show overlay spinner during effect application |
-| Downloading produces unexpected format | User uploads PNG with transparency, downloads JPEG (white background) | Default download format to match upload format; warn when converting PNG to JPEG about transparency loss |
-| Sliders with no numeric display | Users cannot set precise values or communicate settings | Show current numeric value next to each slider; allow direct number input |
-| No way to reset individual effects | User must re-upload to undo a single bad adjustment | Provide per-effect reset buttons and a global "Reset All" |
+| No progress during model download | User thinks app is frozen, closes tab, download wasted | Show progress bar with MB downloaded / total MB |
+| "Remove Background" button with no indication of model size | User on mobile data unknowingly downloads 30MB+ | First-time tooltip: "This will download a 30MB AI model (one-time)" |
+| No way to undo background removal | User removes background, adjusts, realizes removal was wrong, must re-upload | Store original source image; add "Restore Background" toggle |
+| Background removal result looks bad on white canvas | Users expect to see the transparent result but see it against the editor's white/dark background | Show checkerboard pattern behind transparent areas (the CSS checkerboard-bg class already exists) |
+| No visual difference between "processing" and "complete" | User does not know when removal is done | Transition from loading spinner to result with a brief animation or notification |
+| JPEG selected after background removal | User downloads and loses transparency without understanding why | Auto-switch to PNG when background is removed; show explanation if user switches to JPEG |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Image upload:** Often missing dimension validation -- verify images over 4096x4096 are downscaled before canvas processing
-- [ ] **Crop:** Often missing coordinate mapping -- verify cropped output dimensions match expected full-resolution values, not display-scaled values
-- [ ] **Effects/filters:** Often missing non-destructive pipeline -- verify applying brightness then contrast then resetting brightness returns to original contrast-only state
-- [ ] **Download:** Often missing format/quality handling -- verify JPEG quality parameter is set, PNG transparency preserved, and toBlob (not toDataURL) is used
-- [ ] **Rotate:** Often missing canvas resize -- verify rotating a 4000x3000 image produces a 3000x4000 canvas, not a cropped/squished result in the original dimensions
-- [ ] **Mobile:** Often missing touch event handling -- verify crop drag works with touch, sliders work on mobile, and no pinch-zoom conflicts with crop gestures
-- [ ] **HiDPI:** Often missing devicePixelRatio handling -- verify canvas is crisp on Retina displays, not blurry at 2x
-- [ ] **Memory:** Often missing cleanup -- verify opening and processing 5 images in sequence does not leak memory (check browser task manager)
+- [ ] **JPEG export:** After removing background, download as JPEG -- verify transparent areas are white (not black) and user was warned about transparency loss
+- [ ] **Rotation after removal:** Remove background, then rotate 90 degrees -- verify the mask rotates correctly with the image (no misaligned transparency)
+- [ ] **Crop after removal:** Remove background, then crop -- verify transparent areas remain transparent in the cropped result
+- [ ] **Adjustments after removal:** Remove background, then adjust brightness -- verify edge quality does not degrade (no color fringing at mask edges)
+- [ ] **Resize after removal:** Remove background, then resize -- verify the `applyResize` function (which flattens to a new ImageBitmap) preserves the alpha channel
+- [ ] **Mobile memory:** Run background removal on a 4000x3000 image on iOS Safari -- verify no tab crash
+- [ ] **Model caching:** Remove background, reload the page, remove background again -- verify the model does not re-download (check Network tab)
+- [ ] **Safari compatibility:** Run background removal on Safari (no WebGPU) -- verify it falls back to WASM and completes successfully
+- [ ] **Cancel/new image:** Start background removal, then upload a new image before it finishes -- verify no orphaned worker, no stale result applied to the new image
+- [ ] **Undo/restore:** Remove background, then click "Restore Background" -- verify the original image is fully restored with no quality loss
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Canvas memory crashes on mobile | LOW | Add dimension check at upload; downscale before canvas. Isolated to upload pipeline. |
-| Main thread blocking | MEDIUM | Requires extracting processing logic into Web Workers. If effects are pure functions, migration is straightforward; if they depend on DOM, refactoring needed. |
-| Destructive editing pipeline | HIGH | Requires re-architecting how effects are applied. Must add original image caching and parameter-based re-rendering. Touches every effect implementation. |
-| Wrong crop coordinates | LOW | Fix the coordinate transformation math. Contained to crop feature. |
-| toDataURL for download | LOW | Replace with toBlob + createObjectURL. Small, isolated change. |
-| Missing EXIF orientation | MEDIUM | Add EXIF reading to upload pipeline and apply rotation. May require re-testing all downstream features with rotated images. |
+| JPEG export destroys transparency | LOW | Add white-fill before JPEG encode and auto-format-switch. Isolated to download.ts. |
+| Main thread blocking | HIGH | Requires creating a Web Worker, moving model code to worker, adding message protocol. Touches model loading, inference, and result handling. |
+| No download progress | LOW | Wire up Transformers.js `progress_callback`. Isolated to model loading code. |
+| Mask misalignment with transforms | HIGH | Requires rethinking where in the pipeline the mask is applied. May need to refactor renderToCanvas or add a pre-pipeline compositing step. |
+| Edge fringing artifacts | MEDIUM | Switch from putImageData to compositing operations. May require adjusting mask application approach. |
+| Memory exhaustion | MEDIUM | Add `.close()` calls and canvas cleanup. Requires tracing all intermediate objects through the pipeline. |
+| WebGPU fallback failure | LOW | Wrap in try/catch, default to WASM. Isolated to model initialization. |
 
 ## Pitfall-to-Phase Mapping
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| Canvas memory limits | Phase 1: Upload/Display | Upload a 4000x6000 iPhone photo on iOS Safari; confirm it displays correctly |
-| Main thread blocking | Phase 2: Effects | Apply greyscale to a 4000x3000 image; UI must remain responsive (no frame drops) |
-| Destructive editing | Phase 1: Architecture | Apply brightness +50, then contrast +30, then set brightness to 0; result should show only contrast +30 applied to original |
-| EXIF orientation | Phase 1: Upload | Upload portrait photos from iPhone and Android; confirm correct orientation |
-| toDataURL download | Phase 3: Export | Download a 4000x3000 image as JPEG; confirm it completes without freezing and output file is correct |
-| Crop coordinate mapping | Phase 2: Crop | Crop a 4000x3000 image displayed at 800x600; output should be proportionally correct at full resolution |
-| HiDPI blurriness | Phase 1: Display | View editor on a Retina display; canvas content should be sharp, not blurry |
-| Touch/mobile crop | Phase 2: Crop | Perform crop selection on mobile device with touch; handles should be grabbable and draggable |
+| JPEG transparency loss | Export integration | Download background-removed image as JPEG; transparent areas should be white, not black |
+| Main thread blocking | Worker architecture | Click "Remove Background" on a 4000x3000 image; UI sliders and buttons must remain responsive during inference |
+| Model download UX | Model loading | On first click, progress bar shows MB downloaded; on second visit, model loads from cache in <1s |
+| Mask/pipeline misalignment | Core integration | Remove background, rotate 90, flip horizontal, crop center -- all operations should produce correct transparent output |
+| Edge fringing | Mask compositing | Inspect edges of a dark-haired subject on checkerboard; no white or dark halo should be visible |
+| Memory exhaustion | Core integration | Run background removal on a 4000x3000 image on mobile Safari; tab should not crash; memory should return to baseline after operation |
+| WebGPU fallback | Model loading | Test on Safari and Firefox; background removal should complete (slower) without errors |
+| Stale result on new image | State management | Start removal, upload new image immediately; verify new image appears without the old mask applied |
 
 ## Sources
 
-- [Total Canvas Memory Use Exceeds The Maximum Limit - PQINA](https://pqina.nl/blog/total-canvas-memory-use-exceeds-the-maximum-limit/)
-- [Canvas Area Exceeds The Maximum Limit - PQINA](https://pqina.nl/blog/canvas-area-exceeds-the-maximum-limit/)
-- [Optimizing Canvas - MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Optimizing_canvas)
-- [Pixel Manipulation with Canvas - MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Pixel_manipulation_with_canvas)
-- [Faster Canvas Pixel Manipulation with Typed Arrays - Mozilla Hacks](https://hacks.mozilla.org/2011/12/faster-canvas-pixel-manipulation-with-typed-arrays/)
-- [HTMLCanvasElement: toBlob() - MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/toBlob)
-- [HTMLCanvasElement: toDataURL() - MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/toDataURL)
-- [touch-action CSS property - MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/touch-action)
-- [Pinch Zoom Gestures with Pointer Events - MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events/Pinch_zoom_gestures)
-- [Resize Images in JavaScript the Right Way - ImageKit](https://imagekit.io/blog/how-to-resize-image-in-javascript/)
+- [Transformers.js background removal with WebGPU - Medium](https://medium.com/myorder/building-an-ai-background-remover-using-transformer-js-and-webgpu-882b0979f916)
+- [Building a background remover with Vue and Transformers.js - LogRocket](https://blog.logrocket.com/building-background-remover-vue-transformers-js/)
+- [Addy Osmani's bg-remove (Transformers.js reference implementation) - GitHub](https://github.com/addyosmani/bg-remove)
+- [Wes Bos bg-remover - GitHub](https://github.com/wesbos/bg-remover)
+- [@imgly/background-removal WASM issues - GitHub](https://github.com/imgly/background-removal-js/issues/124)
+- [ONNX Runtime Web WASM memory limits - GitHub Issue #10957](https://github.com/microsoft/onnxruntime/issues/10957)
+- [ONNX Runtime Web iOS WASM failure - GitHub Issue #22086](https://github.com/microsoft/onnxruntime/issues/22086)
+- [Canvas premultiplied alpha quantization - DEV Community](https://dev.to/yoya/canvas-getimagedata-premultiplied-alpha-150b)
+- [ImageData alpha premultiplication spec discussion - WHATWG](https://github.com/whatwg/html/issues/5365)
+- [OffscreenCanvas and Web Workers - MDN](https://developer.mozilla.org/en-US/docs/Web/API/OffscreenCanvas)
+- [Optimizing Transformers.js for Production - SitePoint](https://www.sitepoint.com/optimizing-transformers-js-production/)
+- [Transformers.js v4 with WebGPU - adwaitx.com](https://www.adwaitx.com/transformers-js-v4-webgpu-browser-ai/)
+- [Firefox JPEG alpha channel behavior - Mozilla Support](https://support.mozilla.org/en-US/questions/1528694)
 
 ---
-*Pitfalls research for: browser-based client-side image editor*
-*Researched: 2026-03-13*
+*Pitfalls research for: in-browser AI background removal integration with canvas-based image editor*
+*Researched: 2026-03-14*

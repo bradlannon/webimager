@@ -1,136 +1,180 @@
-# Technology Stack
+# Technology Stack: Background Removal Addition
 
-**Project:** WebImager (browser-based image editor)
-**Researched:** 2026-03-13
+**Project:** WebImager v2.0 -- AI Background Removal
+**Researched:** 2026-03-14
+**Scope:** New dependencies only (existing stack validated in v1.0)
 
-## Recommended Stack
+## Recommended Stack Addition
 
-### Core Framework
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| TypeScript | ~5.8 (stable) | Type-safe application code | TS 6.0 is RC as of March 2026 but too new for production use. 5.8/5.9 is battle-tested. Catches canvas API misuse at compile time. | HIGH |
-| Vanilla TypeScript (no UI framework) | N/A | UI layer | This app is a single-view tool, not a multi-page SPA. The UI is mostly a canvas with some sliders and buttons. A framework like React/Svelte adds dependency weight and abstraction overhead for minimal benefit. Direct DOM manipulation with TypeScript is simpler, faster, and produces a smaller bundle. | HIGH |
-| Vite | ^6.x | Build tool, dev server, bundler | Vite 8 just released (hours ago) and is too bleeding-edge. Vite 6.x is stable, fast, and well-documented. Handles TypeScript, CSS, HMR, and static site output out of the box. `vite build` produces optimized static assets ready for deployment. | HIGH |
-
-**Why not React/Svelte/Preact?** This is a single-page tool with one view. The "components" are: a canvas, a toolbar, a few slider groups, and file upload/download buttons. Preact at 3KB is tempting, but vanilla TS is 0KB framework overhead and avoids any abstraction between your code and the Canvas API. The app state is simple: one image, some filter values, a crop rectangle. No routing, no complex component trees, no shared state across distant components. A framework would be overhead without payoff here.
-
-### Image Processing
+### Core ML Library
 
 | Technology | Version | Purpose | Why | Confidence |
 |------------|---------|---------|-----|------------|
-| HTML5 Canvas API | Native | Core image rendering and manipulation | Built into every browser. No dependency. Handles resize, rotate, flip, pixel manipulation, and filter application. The `CanvasRenderingContext2D.filter` property supports CSS-style filters (brightness, contrast, saturate, blur, grayscale, sepia) natively. | HIGH |
-| Cropper.js | ^2.1.0 | Free-drag crop with selection rectangle | Purpose-built, well-maintained (last published ~4 months ago), 948+ npm dependents. Handles crop selection UI, aspect ratio lock, and touch support. v2 is ES module native with TypeScript types. Rolling your own crop selection UI is significant work for diminishing returns. | HIGH |
+| `@huggingface/transformers` | ^3.8.1 | ML inference runtime for browser | The de facto standard for running ML models in-browser. Handles ONNX model loading, WASM/WebGPU execution, and provides a high-level `pipeline()` API. Published under the official HuggingFace org (replaces the deprecated `@xenova/transformers`). WebGPU acceleration when available, WASM fallback for all browsers. No separate `onnxruntime-web` install needed -- it is bundled. MIT licensed. | HIGH |
 
-**Why not Fabric.js?** Fabric.js (v6.4.3) is a powerful canvas abstraction layer designed for design editors with objects, layers, text, and SVG import. It is 300KB+ and overkill for a photo editor that only needs pixel manipulation and basic transforms. WebImager does not need object management, drag-and-drop shapes, or SVG parsing. Using Canvas API directly is simpler and faster.
+### Model
 
-**Why not Konva.js?** Same reasoning as Fabric.js. Konva is for building interactive canvas apps with draggable nodes/shapes. WebImager manipulates pixels and applies filters to a single image. Direct Canvas API is the right level of abstraction.
+| Model | Size (quantized) | Purpose | Why | Confidence |
+|-------|-------------------|---------|-----|------------|
+| `briaai/RMBG-1.4` (uint8) | ~45 MB | Background segmentation mask | Best browser-compatible background removal model available. RMBG-2.0 exists and has better accuracy (90% vs 74%) but is NOT supported in-browser -- blocked by an onnxruntime-web bug (microsoft/onnxruntime#21968) and produces "Unsupported model type" errors in transformers.js (huggingface/transformers.js#1107). RMBG-1.4 quantized (uint8) delivers excellent quality at ~45 MB, well within acceptable range for a one-time lazy download. Handles arbitrary subjects (products, animals, objects, people). | HIGH |
 
-**Why not a pre-built editor SDK (Filerobot, Pintura, Toast UI)?** These are complete editor UIs. Using one would mean WebImager is just a wrapper around someone else's editor. The project's value is building the editor itself. Pre-built SDKs also limit customization and add significant bundle weight.
+### No Additional Libraries Needed
 
-### Styling
+The existing stack handles everything else:
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| Tailwind CSS | ^4.2.0 | Utility-first styling | v4.2 (Feb 2026) is stable and mature. 5x faster builds than v3. CSS-native approach using `@property` and cascade layers. For a tool UI with sliders, buttons, panels, and responsive layout, Tailwind's utility classes eliminate the need for writing custom CSS files while keeping styles co-located with markup. | HIGH |
+| Concern | Existing Solution | Notes |
+|---------|-------------------|-------|
+| State management | Zustand (v5.0.11, already installed) | Add `backgroundMask`, loading/error states to `EditorStore` |
+| Image compositing | Canvas 2D API (already used) | Apply alpha mask via `globalCompositeOperation = 'destination-in'` |
+| Transparency display | `drawCheckerboard()` (already in `canvas.ts`) | Checkerboard already renders behind transparent areas |
+| Download as PNG | Download util (already implemented) | PNG preserves transparency automatically |
+| UI framework | React 19 + Tailwind v4 (already installed) | One new button/panel component |
+| Build tooling | Vite 6.x (already installed) | Needs minor config additions (see below) |
+| Icons | lucide-react (already installed) | Has suitable icons for background removal UI |
 
-**Why not plain CSS?** This project has enough UI elements (toolbar, panels, sliders, buttons, modals for upload/download) that managing CSS files becomes tedious. Tailwind provides consistent spacing, colors, responsive utilities, and dark mode support without custom stylesheets.
+## Vite Configuration Changes Required
 
-**Why not a component library (DaisyUI, etc.)?** The UI needs are specific enough (image editor panels, crop overlays, filter sliders) that pre-built component styles would need heavy overriding. Tailwind utilities give full control with less friction.
+The existing `vite.config.ts` needs two additions for ONNX/WASM compatibility:
 
-### Performance Optimization
+```typescript
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  optimizeDeps: {
+    exclude: ['@huggingface/transformers'],
+  },
+  worker: {
+    format: 'es',
+  },
+});
+```
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| Web Workers | Native | Offload heavy pixel manipulation | For filter operations on large images (up to 10MB), pixel-level manipulation (brightness/contrast via ImageData) should run off the main thread to prevent UI freezing. Native browser API, no dependency. | MEDIUM |
-| OffscreenCanvas | Native | Canvas operations in workers | Allows canvas rendering in Web Workers. Supported in Chrome, Edge, Safari, and Firefox (with minor differences). Used for filter previews and export rendering without blocking the main thread. | MEDIUM |
+**Why these changes:**
+- `optimizeDeps.exclude`: Vite's dependency pre-bundling attempts to parse WASM imports inside `@huggingface/transformers` and fails. Excluding it lets the browser handle WASM loading natively. This is a well-documented requirement across multiple sources.
+- `worker.format: 'es'`: The background removal worker uses dynamic `import()` to load the transformers library lazily; this requires ES module format in workers.
 
-**MEDIUM confidence because:** For images under 10MB and CSS-style canvas filters (which are GPU-accelerated), Web Workers may be unnecessary for v1. The native `ctx.filter` property handles brightness/contrast/blur efficiently on the main thread. Workers become important for pixel-level ImageData manipulation (custom filters, color matrix transforms). Recommend starting without workers and adding them only if performance testing shows jank.
+## Architecture Integration Points
 
-### Testing
+### Web Worker (critical -- do not skip)
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| Vitest | ^3.x | Unit testing | Native Vite integration, fast, TypeScript-first. Tests run in the same pipeline as the build. | HIGH |
-| Playwright | ^1.50+ | E2E testing for canvas interactions | Can screenshot-compare canvas output. Handles file upload testing. Cross-browser. | MEDIUM |
+Background removal MUST run in a Web Worker. The RMBG-1.4 model inference takes 2-10 seconds depending on image size and device hardware. Running on the main thread would freeze the entire UI.
 
-### Code Quality
+**Pattern:** Create `src/workers/backgroundRemoval.worker.ts` that:
+1. Receives image data via `postMessage` (as `ImageBitmap` -- transferable, zero-copy)
+2. Loads the model on first call via `pipeline('image-segmentation', 'briaai/RMBG-1.4')` (lazy init)
+3. Caches the pipeline instance for subsequent calls (model stays in memory)
+4. Returns the alpha mask as `ImageData` or `ImageBitmap` via `postMessage`
+5. Reports download progress events back to main thread for progress bar
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| ESLint | ^9.x | Linting | Flat config format is now standard. TypeScript-aware rules catch common mistakes. | HIGH |
-| Prettier | ^3.x | Formatting | Consistent code style with zero debate. | HIGH |
+Vite supports `new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })` natively -- no extra plugins needed.
 
-## Supporting Libraries
+### Canvas Pipeline Integration
 
-| Library | Version | Purpose | When to Use | Confidence |
-|---------|---------|---------|-------------|------------|
-| file-saver | ^2.0.5 | Cross-browser file download | If `<a download>` has edge cases in target browsers. May not be needed. | LOW |
-| browser-image-compression | ^2.0.2 | JPEG/PNG compression before download | If users want to control output file size/quality. Nice-to-have, not essential for v1. | LOW |
+The mask from the model integrates into the existing `renderToCanvas()` in `src/utils/canvas.ts`:
+
+1. Model produces a segmentation mask (grayscale image where white = foreground)
+2. Store the mask as an `ImageBitmap` in Zustand state (new `backgroundMask` field)
+3. In `renderToCanvas()`, after drawing the image with transforms/adjustments, apply the mask:
+   ```typescript
+   if (backgroundMask) {
+     ctx.globalCompositeOperation = 'destination-in';
+     ctx.drawImage(backgroundMask, 0, 0, ctx.canvas.width, ctx.canvas.height);
+     ctx.globalCompositeOperation = 'source-over';
+   }
+   ```
+4. The existing `drawCheckerboard()` function handles transparency display
+5. Mask must be regenerated if user applies transforms/crop AFTER background removal
+
+### Store Additions
+
+Add to `EditorStore` interface (in `src/store/editorStore.ts`):
+```typescript
+// Background removal state
+backgroundMask: ImageBitmap | null;
+isRemovingBackground: boolean;
+backgroundRemovalProgress: number;       // 0-100 for model download
+backgroundRemovalError: string | null;
+
+// Background removal actions
+removeBackground: () => Promise<void>;
+restoreBackground: () => void;
+```
+
+This follows the existing pattern of state + actions in the same store (matches `cropMode`, `cropRegion`, etc.).
+
+## Model Loading Strategy
+
+| Concern | Approach |
+|---------|----------|
+| **When to download** | Lazy -- only when user clicks "Remove Background" for the first time |
+| **Model caching** | Browser Cache API via transformers.js built-in caching. Model downloads once from HuggingFace CDN, persists across browser sessions automatically |
+| **Progress feedback** | Transformers.js emits download progress callbacks; wire to `backgroundRemovalProgress` in store for a progress bar |
+| **Execution backend** | WebGPU if available (2-5x faster), automatic WASM fallback (works everywhere). Transformers.js handles detection and selection automatically |
+| **Pipeline caching** | Keep the `pipeline()` instance alive in the worker after first creation. Subsequent removals on new images skip model loading entirely |
 
 ## Alternatives Considered
 
 | Category | Recommended | Alternative | Why Not |
 |----------|-------------|-------------|---------|
-| UI Framework | Vanilla TypeScript | React, Svelte, Preact | Single-view tool app. Framework adds weight and abstraction for no benefit. |
-| Canvas Library | Native Canvas API | Fabric.js (v6.4.3) | Fabric is for design editors with objects/layers. 300KB+ for features we do not need. |
-| Canvas Library | Native Canvas API | Konva.js | Built for draggable node graphs. Wrong abstraction for pixel manipulation. |
-| Crop UI | Cropper.js (v2.1.0) | Custom implementation | Cropper.js handles edge cases (touch, aspect ratio, boundaries) that take weeks to get right. |
-| Build Tool | Vite 6.x | Webpack, Parcel | Vite is faster, simpler config, native ES module dev server. Industry standard for new projects. |
-| CSS | Tailwind v4.2 | Plain CSS, CSS Modules | Enough UI elements to benefit from utility classes. Tailwind v4 is CSS-native (no PostCSS plugin). |
-| Editor SDK | Build our own | Filerobot, Pintura, Toast UI | Project goal IS building the editor. SDKs defeat the purpose. |
-| TypeScript | 5.8 stable | TS 6.0 RC | 6.0 RC just announced March 6, 2026. Too new. 5.8/5.9 is production-ready. |
+| ML runtime | `@huggingface/transformers` | `@imgly/background-removal` (v1.7.0) | AGPL license (viral, incompatible with many projects). Community reports of slower performance. Wraps the same underlying ONNX models with less control over the pipeline. Larger bundle due to bundled model variants. |
+| ML runtime | `@huggingface/transformers` | Raw `onnxruntime-web` | Too low-level. Would need to manually handle model downloading, caching, image preprocessing, postprocessing, and tensor management. Transformers.js wraps all of this with a clean `pipeline()` API. |
+| Model | RMBG-1.4 (quantized) | RMBG-2.0 | Better quality but blocked from in-browser execution. ONNX files are 366 MB+ (quantized) vs 45 MB. Not viable for browser use as of March 2026. |
+| Model | RMBG-1.4 | ModNet | ModNet only handles human/portrait segmentation well. RMBG-1.4 handles arbitrary subjects, which is essential for a general-purpose image editor. |
+| Execution | Web Worker | Main thread | Model inference takes 2-10s. Main thread execution would freeze the entire UI. |
+| Execution | Web Worker | SharedArrayBuffer | Requires COOP/COEP headers (`Cross-Origin-Opener-Policy` / `Cross-Origin-Embedder-Policy`), which complicates static site deployment on GitHub Pages and some CDNs. Standard Web Worker with transferable `ImageBitmap` is simpler and sufficient. |
+| Worker comms | Raw `postMessage` | Comlink | The worker interface is trivially simple (send image, receive mask). Comlink's RPC abstraction adds a dependency for no benefit here. |
 
-## Architecture Notes for Stack
+## What NOT to Add
 
-**Canvas filter strategy (two tiers):**
-
-1. **CSS-style filters** (brightness, contrast, saturate, blur, grayscale, sepia): Use `CanvasRenderingContext2D.filter` property. This is GPU-accelerated in modern browsers and applies instantly. Covers most of WebImager's filter needs.
-
-2. **Pixel-level filters** (custom color adjustments, sharpen): Use `getImageData()` / `putImageData()` to manipulate pixel data directly. This is CPU-bound and slower on large images. Consider Web Workers for these operations if performance is an issue.
-
-**File handling strategy:**
-- Upload: `<input type="file" accept="image/*">` with FileReader API to load into an `<img>` element, then draw to canvas.
-- Download: `canvas.toBlob()` for the processed image, then create a download link with `URL.createObjectURL()`.
-
-**State management:**
-- Plain TypeScript object holding current filter values, crop region, dimensions, and rotation state.
-- No state library needed. The app has one image and one set of adjustments at a time.
+| Library | Why Not |
+|---------|---------|
+| `onnxruntime-web` (direct) | Already bundled inside `@huggingface/transformers`. Adding separately causes version conflicts. |
+| `@imgly/background-removal` | AGPL license, slower, wraps the same models with less control. |
+| `@xenova/transformers` | Deprecated v2 package name. The same library is now published as `@huggingface/transformers` (v3+). |
+| `comlink` | Worker communication is too simple to justify an abstraction library. |
+| TensorFlow.js | Heavier runtime (~1.5 MB), worse model ecosystem for image segmentation, no advantage over ONNX for this task. |
+| Any background removal API/server | Violates the core "client-side only, no server calls" constraint. |
+| `fabric.js` / `konva.js` | Not needed. The existing Canvas 2D API with `globalCompositeOperation` handles mask compositing directly. |
 
 ## Installation
 
 ```bash
-# Initialize project
-npm create vite@latest webimager -- --template vanilla-ts
-
-# Core dependencies
-npm install cropperjs
-
-# Styling
-npm install tailwindcss @tailwindcss/vite
-
-# Dev dependencies
-npm install -D vitest @vitest/browser playwright eslint prettier
+# Single new dependency
+npm install @huggingface/transformers
 ```
 
-## Deployment
+One dependency. That is it.
 
-Static site output via `vite build` produces a `dist/` folder with:
-- `index.html`
-- Hashed JS/CSS bundles
-- Zero server runtime required
+## Hosting / Deployment Impact
 
-Deploy to: GitHub Pages, Netlify, Vercel, Cloudflare Pages, or any static host.
+The RMBG-1.4 model files (~45 MB quantized) are fetched from HuggingFace's CDN by default. This means:
+- **Zero impact on bundle size** -- model is not bundled, it is fetched at runtime on first use
+- **Zero deployment config changes** -- works on GitHub Pages, Netlify, Vercel as-is
+- **Automatic caching** -- browser caches model files across sessions via Cache API
+- **Self-hosting option** -- if offline support is desired later, copy model files to `/public/models/` and set `env.localModelPath`
+
+## Browser Compatibility
+
+| Browser | WASM (baseline) | WebGPU (accelerated) |
+|---------|-----------------|---------------------|
+| Chrome 113+ | Yes | Yes |
+| Edge 113+ | Yes | Yes |
+| Firefox 120+ | Yes | Behind flag |
+| Safari 16.4+ | Yes | No (as of March 2026) |
+
+All target browsers in the project constraints support WASM. WebGPU provides 2-5x speedup where available but is not required for functionality.
 
 ## Sources
 
-- [Cropper.js npm](https://www.npmjs.com/package/cropperjs) - v2.1.0, last published ~4 months ago
-- [Cropper.js docs](https://fengyuanchen.github.io/cropperjs/)
-- [Fabric.js npm](https://www.npmjs.com/package/fabric) - v6.4.3
-- [Vite releases](https://vite.dev/releases) - v6.x stable line
-- [Tailwind CSS v4.2](https://tailwindcss.com/blog/tailwindcss-v4) - Feb 2026 release
-- [TypeScript 6.0 RC announcement](https://devblogs.microsoft.com/typescript/announcing-typescript-6-0-rc/) - March 2026
-- [CanvasRenderingContext2D.filter - MDN](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/filter)
-- [OffscreenCanvas - MDN](https://developer.mozilla.org/en-US/docs/Web/API/OffscreenCanvas)
-- [Cloudinary JS image editor guide 2026](https://cloudinary.com/guides/image-effects/javascript-image-editor)
-- [IMG.LY top 5 JS image manipulation libraries](https://img.ly/blog/the-top-5-open-source-javascript-image-manipulation-libraries/)
+- [Transformers.js v3 announcement](https://huggingface.co/blog/transformersjs-v3) -- WebGPU support, `@huggingface/transformers` package name
+- [Transformers.js v4 preview](https://huggingface.co/blog/transformersjs-v4) -- Upcoming version, not yet stable (use v3)
+- [@huggingface/transformers on npm](https://www.npmjs.com/package/@huggingface/transformers) -- v3.8.1, latest stable
+- [RMBG-1.4 on HuggingFace](https://huggingface.co/briaai/RMBG-1.4) -- Model card, ONNX weights, quantization details
+- [RMBG-2.0 browser blocker](https://huggingface.co/briaai/RMBG-2.0/discussions/12) -- transformers.js support discussion
+- [RMBG-2.0 onnxruntime-web bug](https://github.com/microsoft/onnxruntime/issues/21968) -- Browser execution blocked
+- [RMBG-2.0 unsupported model type](https://github.com/huggingface/transformers.js/issues/1107) -- transformers.js integration error
+- [Addy Osmani's bg-remove](https://github.com/addyosmani/bg-remove) -- Reference React + transformers.js implementation
+- [Wes Bos bg-remover](https://github.com/wesbos/bg-remover) -- Another reference implementation
+- [Optimizing Transformers.js for Production](https://www.sitepoint.com/optimizing-transformers-js-production/) -- Vite config patterns, `optimizeDeps.exclude`
+- [Transformers.js dtypes guide](https://huggingface.co/docs/transformers.js/en/guides/dtypes) -- Quantization options (uint8, fp16, etc.)
+- [@imgly/background-removal on npm](https://www.npmjs.com/package/@imgly/background-removal) -- v1.7.0, AGPL license
+- [BRIA RMBG-2.0 benchmarks](https://blog.bria.ai/benchmarking-blog/brias-new-state-of-the-art-remove-background-2.0-outperforms-the-competition) -- 90% vs 74% accuracy comparison

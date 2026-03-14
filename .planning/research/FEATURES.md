@@ -1,198 +1,182 @@
 # Feature Research
 
-**Domain:** Browser-based image editor (client-side, no account, single-image workflow)
-**Researched:** 2026-03-13
+**Domain:** In-browser AI background removal for a client-side image editor
+**Researched:** 2026-03-14
 **Confidence:** HIGH
+
+## Context
+
+This is a subsequent milestone for WebImager v2.0. The existing v1.0 editor already ships upload, resize, crop, rotate/flip, brightness/contrast/saturation/greyscale, and JPEG/PNG download. All processing is client-side. This research focuses specifically on the background removal feature being added.
+
+The v1.0 FEATURES.md (researched 2026-03-13) covered the general editor feature landscape. This document supersedes it for the v2.0 milestone scope.
 
 ## Competitive Landscape Context
 
-This product occupies a specific niche: **simple, no-signup, client-side image editing**. It is NOT competing with Photopea (Photoshop clone with layers, masks, PSD support) or Canva (design platform with templates). It IS competing with tools like ImgModify, PicResize, RedKetchup Image Resizer, and BeFunky's quick-edit mode -- tools where users land, edit one photo, and leave.
-
-The key insight: users of these simple tools want **speed and privacy**, not power. They chose a simple tool over Photopea deliberately.
+Background removal is dominated by server-side tools (remove.bg, Photoroom, Canva) that require accounts and have free-tier limits. WebImager's angle is unique: **fully client-side, no upload, no account, unlimited use, integrated into an editor**. This is not competing on removal quality (server-side models with large GPUs will always win on edge cases). It is competing on privacy, simplicity, and the integrated editing workflow.
 
 ## Feature Landscape
 
 ### Table Stakes (Users Expect These)
 
-Features users assume exist. Missing these = product feels incomplete or broken.
+Features users assume exist when they click "Remove Background." Missing any of these and the feature feels broken.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| Image upload (drag-and-drop + file picker) | Every editor has this; drag-and-drop is the modern expectation | LOW | Support JPEG, PNG, WebP at minimum. Drag-and-drop is non-negotiable UX |
-| Resize by dimensions | Core utility -- many users come specifically for this | LOW | Must include aspect-ratio lock toggle. Show both pixel dimensions |
-| Crop with draggable selection | Every image editor has crop; free-drag is the standard interaction | MEDIUM | Need a visible, resizable selection rectangle with handles |
-| Rotate (90-degree increments) | Basic orientation correction; phones often produce rotated images | LOW | Left/right 90-degree rotation buttons |
-| Flip (horizontal/vertical) | Paired with rotate as basic transform; users expect both | LOW | Two buttons, trivial canvas operation |
-| Brightness/contrast sliders | Most basic adjustment -- even phone editors have this | LOW | Real-time preview is critical; laggy sliders kill the experience |
-| Download result | The entire point of the tool | LOW | JPEG and PNG at minimum. Respect original format by default |
-| Real-time preview | Users expect to see changes as they adjust sliders | MEDIUM | Must be performant; debounce slider updates on large images |
-| Responsive layout | Users will try this on tablets and phones | MEDIUM | Touch-friendly controls, but full mobile editing UX is v2 |
-| No signup / no account required | Core value prop of simple editors; any login wall = user leaves | LOW | Not a feature to build, but a constraint to never violate |
+| One-click background removal | Every competitor does this in a single click. Users expect zero configuration before seeing a result. | MEDIUM | Core ML inference pipeline. `@imgly/background-removal` wraps ONNX Runtime Web with ISNET model. Returns a PNG blob with alpha channel. Main implementation work is integrating the model, running inference in a Web Worker, and wiring the mask into the render pipeline. |
+| Transparent background preview | Users need to see what they got. A checkerboard pattern behind the subject is the universal transparency indicator (Photoshop, Figma, every design tool uses this). | LOW | Draw a checkerboard pattern on the canvas beneath the masked image. Toggle between original view and removed-background view. |
+| Loading/progress feedback | The ML model is ~10MB on first download and inference takes 1-5 seconds. Without feedback, users assume the app crashed. | LOW | `@imgly/background-removal` supports progress callbacks for model download and inference stages. Show a progress bar or percentage during download, spinner during inference. |
+| PNG export with transparency | The primary use case: get a subject on a transparent background for compositing elsewhere. | LOW | WebImager already exports PNG via `canvas.toBlob('image/png')`. The work is ensuring the alpha channel from the mask survives through `renderToCanvas()`. Currently the pipeline uses `ImageBitmap` which supports alpha. Verify the render pipeline does not flatten alpha (e.g., by drawing onto a white-filled canvas). |
+| JPEG export handles missing background | JPEG has no alpha channel. If user exports as JPEG after removal, the transparent area must become white (not black, not garbage pixels). | LOW | When format is `image/jpeg`, fill the canvas with white before compositing the masked image. Simple but easy to forget -- results in a black background if missed. |
+| Revert to original | Users expect to undo the removal if results are bad or they change their mind. | LOW | WebImager's non-destructive pipeline already preserves the source `ImageBitmap`. Add a `backgroundRemoved` flag to `EditorState`. The mask is applied at render time, not baked into the source. A "Restore Background" button toggles the flag. |
+| Works on common subjects | People, products, animals, objects on reasonably distinct backgrounds. Users expect these to work without manual intervention. | N/A (model quality) | ISNET/U2NET models handle these well. Hair detail on complex backgrounds is where quality drops. This is acceptable -- all free tools have this limitation. |
 
 ### Differentiators (Competitive Advantage)
 
-Features that set WebImager apart from the many simple editors that exist. These should align with the core value: **quick, private, zero-friction editing**.
+Features that set WebImager apart. Not required for a working removal feature, but increase value.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Saturation adjustment | Many simple editors skip this; it is a common user need (e.g., making food photos pop) | LOW | Slider alongside brightness/contrast -- trivial to add once those work |
-| Preset filters (sepia, vintage, warm, cool) | Users love one-click transformations; makes the tool feel polished and fun | MEDIUM | 6-8 presets is the sweet spot. Each filter is a set of adjustment values applied together |
-| Greyscale conversion | Commonly needed for documents, printing, artistic effect | LOW | Single toggle; can also be a filter preset |
-| Blur/sharpen with intensity | Simple editors rarely offer adjustable blur/sharpen; useful for privacy (blur faces) and photo correction | MEDIUM | Convolution kernel on canvas; must be performant on large images. Consider Web Workers |
-| Format conversion on download | Users often need JPEG-to-PNG or vice versa; many simple tools lock to input format | LOW | Dropdown in download dialog; canvas.toBlob supports JPEG, PNG, WebP natively |
-| Quality slider on JPEG download | Control over file size vs quality tradeoff; power users expect this | LOW | Range slider 1-100, show estimated file size if feasible |
-| Client-side processing indicator | Privacy badge/message ("Your images never leave your device") builds trust | LOW | Static UI element, but meaningfully differentiates from server-upload tools |
-| Keyboard shortcuts | Power users editing many images in a row expect Ctrl+Z, Ctrl+S, etc. | LOW | Low effort, high polish signal |
+| Solid color background replacement | Most free tools give transparent PNG only. Letting users pick white, black, or a custom color is a quick win. Product photographers for Amazon/eBay specifically need white backgrounds. | LOW | After generating the mask, composite the subject over a filled rectangle. A color picker with preset swatches (white, black, grey, custom). Minimal UI addition. |
+| Combined with existing adjustments | WebImager already has brightness/contrast/saturation. Applying these to the subject after removal (e.g., brighten a dark product photo) is something standalone removal tools cannot do. This is the natural advantage of being an editor. | LOW | Already works if the render pipeline applies adjustments after masking. Verify render order: source -> crop -> mask -> adjustments -> export. No extra UI needed. |
+| Edge softness / feathering slider | A single slider controlling mask edge softness prevents the harsh "cut out with scissors" look. Clipping Magic charges for this. Most free tools offer no edge control. | MEDIUM | Apply a Gaussian blur to the alpha mask before compositing. Map a 0-100% slider to a blur radius (0-5px). This is post-processing on the mask, not model re-inference. |
+| Before/after comparison toggle | Quick flip between original and removed-background view. Useful for quality assessment and surprisingly satisfying to use. | LOW | A toggle button that swaps between rendering with and without the mask. Can reuse this pattern for future adjustment comparisons. |
+| Privacy as a feature | "Your images never leave your device -- not even for AI processing." No competitor can say this because they all use server-side models. | LOW | Already have a privacy badge in v1. Update messaging to explicitly mention AI processing stays local. Zero implementation cost, high trust value. |
+| Offline capability after first use | After the model downloads once, background removal works without internet. No competitor offers this. | MEDIUM | `@imgly/background-removal` can cache the model. Verify IndexedDB caching works across browsers. May need to configure `publicPath` and caching strategy. |
 
-### Anti-Features (Deliberately NOT Building)
+### Anti-Features (Commonly Requested, Often Problematic)
 
-Features that seem good but conflict with WebImager's core value of simplicity and zero-friction.
+Features that seem good but create problems in WebImager's context.
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| Layers | "Real" editors have layers | Massively increases complexity (rendering, UI, state management). Turns a simple tool into a Photopea competitor -- a fight you lose | Single-image pipeline with stacked adjustments. Undo is sufficient |
-| Undo/redo history stack | Users want to experiment safely | A full history stack with branching adds significant state management complexity | Simple single-level undo (revert to original) for v1. Consider linear undo stack in v1.x |
-| User accounts / cloud save | Users want to resume later | Requires a backend, authentication, storage -- violates the core "no server" constraint | Browser localStorage for last session, or "save project as JSON" file |
-| Batch processing | "I have 50 photos to resize" | Completely different UX paradigm; complicates the single-image workflow | Scope to v2+ if validated. Different product surface |
-| AI features (background removal, object removal, generative fill) | Every competitor is adding AI | Requires ML model loading (large downloads), GPU compute, or server-side API calls. Conflicts with lightweight/client-side constraint | Stick to deterministic image processing. AI is table stakes for Canva/Pixlr, not for simple editors |
-| Text/annotation overlay | "Add watermark" or "add caption" | Introduces text rendering, font loading, positioning UI -- significant scope increase for a photo editor | Out of scope. Users needing text should use Canva |
-| Drawing/painting tools | "I want to draw on my photo" | Requires brush engine, pressure sensitivity, color picker -- a whole sub-product | Out of scope entirely |
-| Template system | "Give me Instagram-sized templates" | Design tool, not photo editor. Different product category | Offer common resize presets (1080x1080, 1920x1080) as quick-select options instead |
-| Before/after comparison toggle | Seems useful for seeing changes | PROJECT.md explicitly scopes this out; live preview serves the same purpose with less UI complexity | Real-time preview + "reset to original" button |
+| Manual mask painting / brush tool | Users want to fix areas the AI missed by painting on the mask. | Requires a full brush engine (size, hardness, opacity), an undo stack for brush strokes, and effectively a layer system. Massive complexity jump that violates WebImager's "keep it simple" philosophy. Turns a one-click tool into Photoshop. | Accept that edge cases will not be perfect. The edge softness slider handles most "harsh edge" complaints. Users needing pixel-perfect masks should use Photopea or Photoshop. |
+| Batch background removal | Process multiple images at once. | Violates the single-image workflow constraint in PROJECT.md. Each image takes 1-5 seconds of inference. Memory usage scales linearly. UI for managing a queue of results is a whole sub-product. | Stay single-image. Users needing batch should use remove.bg's API or similar. |
+| Background replacement with uploaded image | Upload a second image as the new background (e.g., put yourself on a beach). | Introduces a second image pipeline, positioning/scaling/tiling controls, and layer compositing. Scope explosion. The UI for positioning a background image behind a subject is essentially building a layer system. | Offer solid color replacement. Users can download the transparent PNG and composite in Canva/Figma/anything. |
+| Server-side fallback for better quality | Some models run better on GPU servers. Offer cloud option for hard cases. | Violates the core constraint: "All processing happens client-side." Introduces server costs, privacy concerns, API keys, authentication, and the need for a backend. Exactly what WebImager avoids. | Use the best client-side model available. ISNET via `@imgly/background-removal` is state-of-the-art for browser inference. Quality will improve as models and WebGPU support mature. |
+| Multiple subject selection / instance segmentation | Let users choose which detected subjects to keep (e.g., keep person A but not person B). | Requires instance segmentation (per-object detection), not just foreground/background separation. Different model architecture, much more complex UI with selectable regions. | The model keeps all foreground subjects. Users can crop to isolate specific subjects (crop already exists in v1). |
+| Real-time video background removal | Apply removal to webcam or video. | Entirely different technical domain. Still-image models run at 1-5 seconds per frame, far too slow for 30fps video. Architecture is completely different (streaming inference, temporal consistency). | Out of scope. This is an image editor. |
+| Background blur (portrait mode effect) | Keep the background but blur it, like phone portrait mode. | Different from removal -- requires depth estimation or segmentation with a blur pass. The mask from background removal could theoretically be reused, but applying variable blur based on a binary mask looks cheap. Real portrait blur needs depth maps. | Defer to v3+ if there is demand. Would need a separate "portrait blur" feature, not a mode of background removal. |
 
 ## Feature Dependencies
 
 ```
-[Image Upload]
-    |
-    +---> [Real-time Preview] (canvas rendering pipeline)
-    |         |
-    |         +---> [Brightness/Contrast/Saturation Sliders]
-    |         +---> [Preset Filters] (requires adjustment pipeline)
-    |         +---> [Greyscale Toggle]
-    |         +---> [Blur/Sharpen]
-    |         +---> [Crop Selection]
-    |         +---> [Resize Controls]
-    |         +---> [Rotate/Flip]
-    |
-    +---> [Download] (requires rendered canvas output)
-              |
-              +---> [Format Selection]
-              +---> [Quality Slider]
+[ML Model Loading + Caching]
+    └──requires──> [One-click removal] (core inference)
+                       └──enables──> [Transparent PNG export]
+                       └──enables──> [Solid color replacement]
+                       └──enables──> [Edge softness slider]
+                       └──enables──> [Before/after toggle]
+                       └──enables──> [JPEG white-fill compositing]
 
-[Crop Selection] --conflicts-with--> [Adjustment Sliders] (during active crop)
-[Blur/Sharpen] --requires--> [Web Workers or OffscreenCanvas] (for performance)
+[Existing render pipeline]
+    └──requires modification──> [Alpha channel preservation]
+        └──enables──> [Transparent PNG export]
+
+[Existing adjustments (brightness/contrast/saturation)]
+    └──enhances──> [Background removal]
+        (adjustments apply to the masked result -- verify pipeline order)
+
+[Existing crop tool]
+    └──enhances──> [Background removal]
+        (crop after removal to tighten framing around subject)
+
+[Existing PNG download]
+    └──enables──> [Transparent PNG export]
+        (format already supported; ensure alpha survives toBlob)
 ```
 
 ### Dependency Notes
 
-- **Everything requires Image Upload + Canvas Pipeline:** The rendering pipeline is the foundation. Build this first and make it solid.
-- **Adjustments require Real-time Preview:** Sliders without instant feedback are useless. The preview pipeline must be performant before adding adjustment features.
-- **Preset Filters require Adjustment Pipeline:** Filters are just pre-configured combinations of brightness, contrast, saturation, and color matrix values. Build the adjustment system first, then filters are trivial.
-- **Crop conflicts with Adjustments during interaction:** When the crop selection rectangle is active, slider adjustments should still preview but the UI needs clear mode separation (editing vs. cropping).
-- **Blur/Sharpen is computationally expensive:** Unlike color adjustments (per-pixel, fast), convolution operations on large images can freeze the UI. Web Workers or OffscreenCanvas may be needed.
-- **Download depends on rendered canvas:** The download feature reads the final canvas state. Format conversion and quality control are just parameters to `canvas.toBlob()`.
+- **One-click removal requires ML model loading:** The ONNX model must download (~10MB first time) and initialize before any inference. This is the critical path. Everything else depends on having a working foreground mask.
+- **Transparent PNG export requires alpha channel preservation:** WebImager's `renderToCanvas()` must not flatten alpha. Currently it calls `ctx.drawImage()` which preserves alpha, but verify there is no `ctx.fillRect(white)` call clearing the canvas before drawing. JPEG export must explicitly fill white first.
+- **Solid color replacement requires the mask:** Cannot replace the background without first having the foreground/background separation.
+- **Edge softness requires the mask:** The feathering slider post-processes the alpha mask with a blur before compositing. Does not re-run inference.
+- **Existing adjustments enhance removal for free:** If the render pipeline applies adjustments (brightness, contrast, etc.) after the mask, users can adjust the isolated subject. Verify the pipeline order does not apply adjustments before masking (which would adjust the background too, then remove it -- correct but wasteful).
+- **Existing crop enhances removal for free:** Users can crop tightly around the subject after removal. Already works if crop applies in the pipeline regardless of mask state.
 
 ## MVP Definition
 
-### Launch With (v1)
+### Launch With (v2.0)
 
-Minimum viable product -- what validates the core value proposition of "quick, private, no-signup photo editing."
+Minimum viable background removal -- what ships as the v2.0 feature.
 
-- [ ] Drag-and-drop + file picker upload (JPEG, PNG, WebP, under 10MB) -- the entry point
-- [ ] Canvas-based preview with real-time rendering -- the foundation everything depends on
-- [ ] Resize with dimension inputs and aspect-ratio lock -- the #1 reason users visit simple editors
-- [ ] Free-drag crop with resizable selection rectangle -- the #2 reason
-- [ ] Rotate 90 degrees (left/right) and flip (horizontal/vertical) -- trivial to add, expected
-- [ ] Brightness, contrast, and saturation sliders with live preview -- core adjustment trifecta
-- [ ] Greyscale conversion -- one toggle, high utility
-- [ ] Preset filters (6-8: sepia, vintage, warm, cool, high-contrast, fade, vivid, B&W) -- polish and delight
-- [ ] Blur and sharpen with intensity sliders -- differentiator, justified by project spec
-- [ ] Download as JPEG or PNG with format selection -- the exit point
+- [ ] One-click "Remove Background" button in the sidebar -- single entry point, no configuration needed
+- [ ] ML inference via `@imgly/background-removal` running in a Web Worker to keep UI responsive
+- [ ] Progress indicator during model download (first use) and inference
+- [ ] Transparent background preview with checkerboard pattern on canvas
+- [ ] Non-destructive mask in the render pipeline (toggle on/off, source image preserved)
+- [ ] "Restore Background" button to revert
+- [ ] PNG download preserves alpha channel (transparent background)
+- [ ] JPEG download composites onto white background (not black)
 
-### Add After Validation (v1.x)
+### Add After Validation (v2.x)
 
-Features to add once core editing works well and users are actually using it.
+Features to add once core removal is working and stable.
 
-- [ ] JPEG quality slider on download -- when users ask "how do I make the file smaller"
-- [ ] Common resize presets (social media sizes, common print sizes) -- when resize is the most-used feature
-- [ ] Single-level undo (revert to original) -- when users complain about not being able to go back
-- [ ] Keyboard shortcuts -- when power users emerge
-- [ ] WebP download support -- when users specifically request it
-- [ ] "Your images never leave your device" privacy indicator -- when marketing the tool
+- [ ] Solid color background replacement (white, black, custom picker) -- highest-value differentiator, low effort
+- [ ] Edge softness/feathering slider -- improves perceived quality significantly
+- [ ] Before/after comparison toggle -- low effort, good UX polish
+- [ ] Verify and optimize model caching in IndexedDB across browsers
 
-### Future Consideration (v2+)
+### Future Consideration (v3+)
 
-Features to defer until product-market fit is established.
-
-- [ ] Multi-level undo/redo stack -- significant state management complexity
-- [ ] Batch processing -- different product surface entirely
-- [ ] Touch-optimized mobile editing -- requires rethinking crop/slider interactions for touch
-- [ ] Color temperature / tint adjustments -- nice but not essential
-- [ ] Vignette effect -- could be a filter preset instead
-- [ ] Image metadata (EXIF) viewer/stripper -- niche but privacy-conscious users want it
-- [ ] Save/load editing state to file -- "project file" without needing accounts
+- [ ] Multiple model options (quality vs speed tradeoff) -- adds UI complexity for marginal gain
+- [ ] Background blur / portrait mode effect -- needs separate research, different technique
+- [ ] WebGPU acceleration for faster inference -- browser support still maturing
 
 ## Feature Prioritization Matrix
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| Drag-and-drop upload | HIGH | LOW | P1 |
-| Canvas preview pipeline | HIGH | MEDIUM | P1 |
-| Resize with aspect lock | HIGH | LOW | P1 |
-| Free-drag crop | HIGH | MEDIUM | P1 |
-| Rotate/flip | MEDIUM | LOW | P1 |
-| Brightness/contrast/saturation | HIGH | LOW | P1 |
-| Greyscale | MEDIUM | LOW | P1 |
-| Download (JPEG/PNG) | HIGH | LOW | P1 |
-| Preset filters | MEDIUM | LOW | P1 |
-| Blur/sharpen | MEDIUM | MEDIUM | P1 |
-| JPEG quality slider | MEDIUM | LOW | P2 |
-| Resize presets | LOW | LOW | P2 |
-| Revert to original | MEDIUM | LOW | P2 |
-| Keyboard shortcuts | LOW | LOW | P2 |
-| Privacy indicator | LOW | LOW | P2 |
-| Multi-level undo/redo | MEDIUM | HIGH | P3 |
-| Batch processing | MEDIUM | HIGH | P3 |
-| Mobile-optimized editing | MEDIUM | HIGH | P3 |
-| EXIF viewer/stripper | LOW | MEDIUM | P3 |
+| One-click removal | HIGH | MEDIUM | P1 |
+| Progress indicator | HIGH | LOW | P1 |
+| Transparent preview (checkerboard) | HIGH | LOW | P1 |
+| PNG export with alpha | HIGH | LOW | P1 |
+| JPEG white-fill compositing | MEDIUM | LOW | P1 |
+| Revert to original | HIGH | LOW | P1 |
+| Solid color replacement | MEDIUM | LOW | P2 |
+| Edge softness slider | MEDIUM | MEDIUM | P2 |
+| Before/after toggle | LOW | LOW | P2 |
+| Model caching optimization | MEDIUM | MEDIUM | P2 |
+| Background blur effect | LOW | HIGH | P3 |
+| Multiple model options | LOW | HIGH | P3 |
+| WebGPU acceleration | LOW | HIGH | P3 |
 
 **Priority key:**
-- P1: Must have for launch
-- P2: Should have, add when possible
+- P1: Must have for v2.0 launch
+- P2: Should have, add in v2.x
 - P3: Nice to have, future consideration
 
 ## Competitor Feature Analysis
 
-| Feature | Photopea | Pixlr | ImgModify | PicResize | BeFunky | WebImager (Our Approach) |
-|---------|----------|-------|-----------|-----------|---------|-------------------------|
-| Signup required | No | Optional (AI features need it) | No | No | Optional | No -- never |
-| Client-side processing | Yes | No (server-side) | Yes | No (server-side) | No (server-side) | Yes -- core constraint |
-| Layers | Yes | Yes | No | No | No | No -- deliberately |
-| Resize | Yes | Yes | Yes | Yes | Yes | Yes |
-| Crop | Yes | Yes | Yes | Yes | Yes | Yes (free-drag) |
-| Filters/effects | Yes (via adjustments) | Yes (AI + manual) | Yes | Yes | Yes (extensive) | Yes (6-8 presets) |
-| Blur/sharpen | Yes | Yes | No | No | Yes | Yes |
-| AI features | Limited | Extensive | No | No | Yes | No -- out of scope |
-| Complexity | Expert | Intermediate | Simple | Simple | Intermediate | Simple |
-| Target user | Designers | Casual-to-intermediate | Quick editors | Quick resizers | Social media creators | Quick editors who value privacy |
+| Feature | remove.bg | Photoroom | Canva | WebImager v2 (plan) |
+|---------|-----------|-----------|-------|---------------------|
+| One-click removal | Yes (server) | Yes (server) | Yes (server) | Yes (client-side) |
+| Transparent PNG | Yes | Yes | Pro only | Yes (free) |
+| Color replacement | White only (free) | Many options | Pro only | White, black, custom |
+| Edge refinement | Paid tier | Basic | No | Feathering slider |
+| Privacy (no upload) | No | No | No | **Yes** |
+| Works offline | No | No | No | **Yes (after model cache)** |
+| Integrated with editor | No (single purpose) | Yes (full suite) | Yes (full suite) | **Yes (resize, crop, adjust)** |
+| Free / no account | Limited free tier | Limited free tier | Limited free tier | **Unlimited, no account** |
+| Processing speed | ~2s (server GPU) | ~2s (server GPU) | ~3s (server GPU) | ~3-5s (client WASM) |
+| Quality on hard cases | Excellent | Excellent | Good | Good (ISNET model) |
+| Batch processing | Paid | Paid | Paid | No (by design) |
 
-### Key Competitive Insight
-
-WebImager's niche is the intersection of **simple** (like ImgModify/PicResize) and **capable** (more adjustments than those tools offer) while being **fully client-side** (unlike Pixlr/BeFunky which upload to servers). The privacy angle is real -- ImgModify also processes client-side, but WebImager can offer more adjustment controls (blur/sharpen, saturation, filters) than the typical simple editor.
+**WebImager's competitive position:** Cannot beat server-side tools on speed or quality for hard cases (hair on complex backgrounds). Wins on privacy, cost (truly free), offline capability, and the integrated editor workflow. The target user is someone who wants to remove a background, adjust the result, and download -- all without signing up or uploading their image to a server.
 
 ## Sources
 
-- [Pixlr - Free Online Photo Editor](https://pixlr.com/)
-- [Photopea - Online Photo Editor](https://www.photopea.com/)
-- [ImgModify - Free Online Image Editor](https://imgmodify.com/)
-- [PicResize - Crop, Resize, Edit images online](https://picresize.com/)
-- [BeFunky Photo Editor](https://www.befunky.com/features/photo-editor/)
-- [iLoveIMG - Online Image Editor](https://www.iloveimg.com/)
-- [Shopify - Best Free Photo Editors (2025)](https://www.shopify.com/blog/14263381-18-free-and-paid-online-photo-editor-tools-for-gorgeous-diy-product-photography)
-- [Cloudinary - JavaScript Image Editor Guide (2026)](https://cloudinary.com/guides/image-effects/javascript-image-editor)
-- [Piktochart - Pixlr vs Photopea Comparison](https://piktochart.com/tips/pixlr-vs-photopea)
+- [IMG.LY: 20x Faster Browser Background Removal with ONNX Runtime](https://img.ly/blog/browser-background-removal-using-onnx-runtime-webgpu/) -- technical architecture, WebGPU performance benchmarks
+- [@imgly/background-removal on npm](https://www.npmjs.com/package/@imgly/background-removal) -- primary client-side library, API reference
+- [imgly/background-removal-js on GitHub](https://github.com/imgly/background-removal-js) -- source, configuration options, model details
+- [Photoroom vs remove.bg comparison](https://www.photoroom.com/blog/photoroom-or-removebg) -- competitor feature analysis
+- [remove.bg vs Photoroom definitive comparison](https://vertu.com/guides/remove-bg-vs-photoroom-the-definitive-comparison/) -- feature expectations
+- [Top 10 AI Background Removal Tools 2026](https://www.scmgalaxy.com/tutorials/top-10-ai-background-removal-tools-in-2025-features-pros-cons-comparison/) -- market landscape
+- [Client-Side AI in 2025](https://medium.com/@sauravgupta2800/client-side-ai-in-2025-what-i-learned-running-ml-models-entirely-in-the-browser-aa12683f457f) -- performance benchmarks, IndexedDB caching patterns
+- [Clipping Magic](https://clippingmagic.com/) -- edge refinement feature reference
+- [Webkul: Browser Based Background Remover using ONNX](https://webkul.com/blog/browser-based-background-remover-using-onnx/) -- implementation patterns
 
 ---
-*Feature research for: Browser-based image editor*
-*Researched: 2026-03-13*
+*Feature research for: In-browser AI background removal (v2.0 milestone)*
+*Researched: 2026-03-14*
