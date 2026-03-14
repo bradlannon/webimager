@@ -59,10 +59,10 @@ Plans:
   2. User can lock crop to aspect ratio presets (16:9, 1:1, 4:3, etc.)
   3. User can enter width and height to resize the image with an aspect ratio lock toggle
   4. Crop and resize produce correct output at full source resolution (not display-scaled)
-**Plans:** 3 plans
+**Plans:** 1/3 plans complete
 
 Plans:
-- [ ] 03-01-PLAN.md — Crop/resize data layer: types, math utilities, store, render pipeline (TDD)
+- [x] 03-01-PLAN.md — Crop/resize data layer: types, math utilities, store, render pipeline (TDD)
 - [ ] 03-02-PLAN.md — CropOverlay and CropToolbar UI, Canvas/Editor/Sidebar wiring
 - [ ] 03-03-PLAN.md — ResizeControls UI component and sidebar integration
 
@@ -75,4 +75,4 @@ Phases execute in numeric order: 1 -> 2 -> 3
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete    | 2026-03-14 |
 | 2. Adjustments | 2/2 | Complete    | 2026-03-14 |
-| 3. Crop & Resize | 0/3 | Not started | - |
+| 3. Crop & Resize | 1/3 | In progress | - |
