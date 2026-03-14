@@ -7,6 +7,10 @@ import {
 
 env.allowLocalModels = false;
 
+// Use single-threaded WASM to avoid SharedArrayBuffer requirement
+// (SharedArrayBuffer needs COOP/COEP headers which may not be available)
+env.backends.onnx.wasm.numThreads = 1;
+
 const MODEL_ID = 'briaai/RMBG-1.4';
 
 let model: any = null;
