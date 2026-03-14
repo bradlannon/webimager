@@ -30,18 +30,6 @@ export function buildFilterString(adjustments: Adjustments): string {
   return parts.length > 0 ? parts.join(' ') : 'none';
 }
 
-/**
- * Calculate bounding box dimensions after rotating a rectangle by an angle.
- */
-function rotatedBounds(w: number, h: number, angleDeg: number): { width: number; height: number } {
-  const rad = (angleDeg * Math.PI) / 180;
-  const cos = Math.abs(Math.cos(rad));
-  const sin = Math.abs(Math.sin(rad));
-  return {
-    width: Math.ceil(w * cos + h * sin),
-    height: Math.ceil(w * sin + h * cos),
-  };
-}
 
 export function renderToCanvas(
   ctx: CanvasRenderingContext2D,
@@ -54,12 +42,9 @@ export function renderToCanvas(
   const { rotation, freeRotation = 0, flipH, flipV } = transforms;
   const totalRotation = rotation + freeRotation;
   const isRotated90 = rotation === 90 || rotation === 270;
-  const stepRotatedW = isRotated90 ? source.height : source.width;
-  const stepRotatedH = isRotated90 ? source.width : source.height;
-  // Bounding box after both 90° steps and free rotation
-  const { width: rotatedW, height: rotatedH } = freeRotation === 0
-    ? { width: stepRotatedW, height: stepRotatedH }
-    : rotatedBounds(stepRotatedW, stepRotatedH, freeRotation);
+  // Canvas stays at the 90°-step dimensions — free rotation clips corners
+  const rotatedW = isRotated90 ? source.height : source.width;
+  const rotatedH = isRotated90 ? source.width : source.height;
 
   // Check if crop is active and not the full image
   const hasCrop = crop && !(crop.x === 0 && crop.y === 0 && crop.width === 100 && crop.height === 100);
