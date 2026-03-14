@@ -51,13 +51,13 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Feature | Reason |
 |---------|--------|
-| User accounts / authentication | No server, no state — client-side only |
+| User accounts / authentication | No server, no state -- client-side only |
 | Batch processing | Single image workflow for v1 simplicity |
-| Backend processing | Core constraint — everything runs in-browser |
+| Backend processing | Core constraint -- everything runs in-browser |
 | Mobile-native app | Web-only; should be responsive but not native |
 | Layers / undo history stack | Keeps it simple, not Photoshop |
 | Before/after comparison | Live preview is sufficient for v1 |
-| AI-powered effects | Requires large model downloads or server — violates constraints |
+| AI-powered effects | Requires large model downloads or server -- violates constraints |
 
 ## Traceability
 
@@ -65,27 +65,27 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FILE-01 | — | Pending |
-| FILE-02 | — | Pending |
-| FILE-03 | — | Pending |
-| FILE-04 | — | Pending |
-| TRAN-01 | — | Pending |
-| TRAN-02 | — | Pending |
-| TRAN-03 | — | Pending |
-| CROP-01 | — | Pending |
-| CROP-02 | — | Pending |
-| ADJT-01 | — | Pending |
-| ADJT-02 | — | Pending |
-| ADJT-03 | — | Pending |
-| ADJT-04 | — | Pending |
-| UX-01 | — | Pending |
-| UX-02 | — | Pending |
+| FILE-01 | Phase 1 | Pending |
+| FILE-02 | Phase 1 | Pending |
+| FILE-03 | Phase 1 | Pending |
+| FILE-04 | Phase 1 | Pending |
+| TRAN-01 | Phase 3 | Pending |
+| TRAN-02 | Phase 1 | Pending |
+| TRAN-03 | Phase 1 | Pending |
+| CROP-01 | Phase 3 | Pending |
+| CROP-02 | Phase 3 | Pending |
+| ADJT-01 | Phase 2 | Pending |
+| ADJT-02 | Phase 2 | Pending |
+| ADJT-03 | Phase 2 | Pending |
+| ADJT-04 | Phase 2 | Pending |
+| UX-01 | Phase 1 | Pending |
+| UX-02 | Phase 1 | Pending |
 
 **Coverage:**
 - v1 requirements: 15 total
-- Mapped to phases: 0
-- Unmapped: 15 ⚠️
+- Mapped to phases: 15
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-13*
-*Last updated: 2026-03-13 after initial definition*
+*Last updated: 2026-03-13 after roadmap creation*
