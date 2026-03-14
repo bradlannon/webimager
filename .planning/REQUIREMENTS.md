@@ -27,10 +27,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Adjustments
 
-- [ ] **ADJT-01**: User can adjust brightness via slider with live preview
-- [ ] **ADJT-02**: User can adjust contrast via slider with live preview
-- [ ] **ADJT-03**: User can adjust saturation via slider with live preview
-- [ ] **ADJT-04**: User can convert image to greyscale with one click
+- [x] **ADJT-01**: User can adjust brightness via slider with live preview
+- [x] **ADJT-02**: User can adjust contrast via slider with live preview
+- [x] **ADJT-03**: User can adjust saturation via slider with live preview
+- [x] **ADJT-04**: User can convert image to greyscale with one click
 
 ### UX
 
@@ -74,10 +74,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TRAN-03 | Phase 1 | Complete |
 | CROP-01 | Phase 3 | Pending |
 | CROP-02 | Phase 3 | Pending |
-| ADJT-01 | Phase 2 | Pending |
-| ADJT-02 | Phase 2 | Pending |
-| ADJT-03 | Phase 2 | Pending |
-| ADJT-04 | Phase 2 | Pending |
+| ADJT-01 | Phase 2 | Complete |
+| ADJT-02 | Phase 2 | Complete |
+| ADJT-03 | Phase 2 | Complete |
+| ADJT-04 | Phase 2 | Complete |
 | UX-01 | Phase 1 | Complete |
 | UX-02 | Phase 1 | Complete |
 
