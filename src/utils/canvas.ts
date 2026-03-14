@@ -35,7 +35,8 @@ export function renderToCanvas(
   source: ImageBitmap,
   transforms: Transforms,
   adjustments?: Adjustments,
-  crop?: CropRegion
+  crop?: CropRegion,
+  backgroundMask?: ImageData | null
 ): void {
   const { rotation, flipH, flipV } = transforms;
   const isRotated90 = rotation === 90 || rotation === 270;
@@ -71,6 +72,40 @@ export function renderToCanvas(
     }
     ctx.drawImage(offscreen, sx, sy, sw, sh, 0, 0, sw, sh);
     ctx.restore();
+
+    // Step 3: Apply background mask AFTER filters (avoids premultiplied alpha fringing)
+    if (backgroundMask) {
+      // Transform mask identically: put at source dims, rotate/flip, extract crop
+      const maskSource = document.createElement('canvas');
+      maskSource.width = source.width;
+      maskSource.height = source.height;
+      const maskSourceCtx = maskSource.getContext('2d')!;
+      maskSourceCtx.putImageData(backgroundMask, 0, 0);
+
+      // Rotate/flip mask same as source
+      const maskRotated = document.createElement('canvas');
+      maskRotated.width = rotatedW;
+      maskRotated.height = rotatedH;
+      const maskRotCtx = maskRotated.getContext('2d')!;
+      maskRotCtx.save();
+      maskRotCtx.translate(rotatedW / 2, rotatedH / 2);
+      maskRotCtx.rotate((rotation * Math.PI) / 180);
+      maskRotCtx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+      maskRotCtx.drawImage(maskSource, -source.width / 2, -source.height / 2);
+      maskRotCtx.restore();
+
+      // Extract crop region from transformed mask
+      const maskCropped = document.createElement('canvas');
+      maskCropped.width = sw;
+      maskCropped.height = sh;
+      const maskCropCtx = maskCropped.getContext('2d')!;
+      maskCropCtx.drawImage(maskRotated, sx, sy, sw, sh, 0, 0, sw, sh);
+
+      // Composite: keep only pixels where mask has alpha
+      ctx.globalCompositeOperation = 'destination-in';
+      ctx.drawImage(maskCropped, 0, 0);
+      ctx.globalCompositeOperation = 'source-over';
+    }
   } else {
     // No crop: existing fast path
     ctx.canvas.width = rotatedW;
@@ -84,6 +119,32 @@ export function renderToCanvas(
     }
     ctx.drawImage(source, -source.width / 2, -source.height / 2);
     ctx.restore();
+
+    // Apply background mask AFTER filters (avoids premultiplied alpha fringing)
+    if (backgroundMask) {
+      // Transform mask identically: put at source dims, rotate/flip
+      const maskSource = document.createElement('canvas');
+      maskSource.width = source.width;
+      maskSource.height = source.height;
+      const maskSourceCtx = maskSource.getContext('2d')!;
+      maskSourceCtx.putImageData(backgroundMask, 0, 0);
+
+      const maskCanvas = document.createElement('canvas');
+      maskCanvas.width = rotatedW;
+      maskCanvas.height = rotatedH;
+      const maskCtx = maskCanvas.getContext('2d')!;
+      maskCtx.save();
+      maskCtx.translate(rotatedW / 2, rotatedH / 2);
+      maskCtx.rotate((rotation * Math.PI) / 180);
+      maskCtx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+      maskCtx.drawImage(maskSource, -source.width / 2, -source.height / 2);
+      maskCtx.restore();
+
+      // Composite: keep only pixels where mask has alpha
+      ctx.globalCompositeOperation = 'destination-in';
+      ctx.drawImage(maskCanvas, 0, 0);
+      ctx.globalCompositeOperation = 'source-over';
+    }
   }
 }
 

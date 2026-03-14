@@ -8,6 +8,8 @@ export function useRenderPipeline(canvasRef: RefObject<HTMLCanvasElement | null>
   const adjustments = useEditorStore((s) => s.adjustments);
   const cropRegion = useEditorStore((s) => s.cropRegion);
   const cropMode = useEditorStore((s) => s.cropMode);
+  const backgroundRemoved = useEditorStore((s) => s.backgroundRemoved);
+  const backgroundMask = useEditorStore((s) => s.backgroundMask);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -21,10 +23,13 @@ export function useRenderPipeline(canvasRef: RefObject<HTMLCanvasElement | null>
     // render WITH crop applied.
     const activeCrop = cropMode ? undefined : cropRegion ?? undefined;
 
-    // Render the image with transforms, adjustments, and optional crop
-    renderToCanvas(ctx, sourceImage, transforms, adjustments, activeCrop);
+    // Pass background mask only when background removal is active
+    const activeMask = backgroundRemoved ? backgroundMask : undefined;
+
+    // Render the image with transforms, adjustments, optional crop, and optional mask
+    renderToCanvas(ctx, sourceImage, transforms, adjustments, activeCrop, activeMask);
 
     // Draw checkerboard behind image on a separate pass
     // (The checkerboard is drawn underneath via CSS or a background canvas)
-  }, [canvasRef, sourceImage, transforms, adjustments, cropRegion, cropMode]);
+  }, [canvasRef, sourceImage, transforms, adjustments, cropRegion, cropMode, backgroundRemoved, backgroundMask]);
 }

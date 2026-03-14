@@ -63,7 +63,7 @@ describe('downloadImage', () => {
 
     expect(document.createElement).toHaveBeenCalledWith('canvas');
     expect(mockCanvas.getContext).toHaveBeenCalledWith('2d');
-    expect(mockRenderToCanvas).toHaveBeenCalledWith(mockCtx, source, transforms, defaultAdjustments, undefined);
+    expect(mockRenderToCanvas).toHaveBeenCalledWith(mockCtx, source, transforms, defaultAdjustments, undefined, undefined);
   });
 
   test('calls toBlob with image/jpeg and quality for JPEG format', async () => {
