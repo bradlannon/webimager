@@ -35,11 +35,12 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details
   3. User clicks "Restore Background" and the original image is fully restored with no quality loss
   4. Background removal result remains visually correct after applying rotation, flip, crop, or adjustment edits (mask aligns with transforms)
   5. UI remains fully responsive during the entire background removal process (no freezing or hanging)
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 04-01: TBD
-- [ ] 04-02: TBD
+- [ ] 04-01-PLAN.md — Install dependency, extend types/store, create Web Worker
+- [ ] 04-02-PLAN.md — Create useBackgroundRemoval hook, add mask compositing to render pipeline
+- [ ] 04-03-PLAN.md — Build BackgroundControls UI, wire into sidebar, dark mode checkerboard
 
 ### Phase 5: Export and Background Replacement
 **Goal**: Users can export background-removed images correctly in any format and optionally replace transparent backgrounds with solid colors
@@ -65,5 +66,5 @@ Phases execute in numeric order: 4 → 5
 | 1. Foundation | v1.0 | 3/3 | Complete | 2026-03-14 |
 | 2. Adjustments | v1.0 | 2/2 | Complete | 2026-03-14 |
 | 3. Crop & Resize | v1.0 | 3/3 | Complete | 2026-03-14 |
-| 4. Background Removal Engine | v2.0 | 0/? | Not started | - |
+| 4. Background Removal Engine | v2.0 | 0/3 | Not started | - |
 | 5. Export and Background Replacement | v2.0 | 0/? | Not started | - |
