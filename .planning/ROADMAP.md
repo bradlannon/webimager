@@ -51,10 +51,11 @@ Plans:
   2. When user downloads as JPEG with background removal active, transparent areas appear as white (not black) in the downloaded file
   3. User sees a clear warning when selecting JPEG format while transparency is active, explaining that transparency will be lost
   4. User can replace the transparent background with a solid color (white, black, or custom color via picker) and see the result immediately on canvas
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 05-01: TBD
+- [ ] 05-01-PLAN.md — Transparency-aware export: JPEG white-fill, auto-PNG promotion, JPEG warning
+- [ ] 05-02-PLAN.md — Background replacement: solid color picker with canvas preview
 
 ### Phase 6: Sidebar Redesign - Move sidebar to bottom bar with professional UI design
 **Goal:** Replace sidebar with bottom icon tab bar and slide-up overlay panels, redesign editor chrome with glassmorphism styling, top bar matching bradlannon.ca navigation
@@ -83,5 +84,5 @@ Phases execute in numeric order: 4 → 5 → 6
 | 2. Adjustments | v1.0 | 2/2 | Complete | 2026-03-14 |
 | 3. Crop & Resize | v1.0 | 3/3 | Complete | 2026-03-14 |
 | 4. Background Removal Engine | 2/3 | In Progress|  | - |
-| 5. Export and Background Replacement | v2.0 | 0/? | Not started | - |
+| 5. Export and Background Replacement | v2.0 | 0/2 | Not started | - |
 | 6. Sidebar Redesign | 2/2 | Complete   | 2026-03-14 | 2026-03-14 |
