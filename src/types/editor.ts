@@ -1,5 +1,6 @@
 export interface Transforms {
   rotation: 0 | 90 | 180 | 270;
+  freeRotation: number; // degrees, -45 to 45 for fine-tuning straighten
   flipH: boolean;
   flipV: boolean;
 }
@@ -30,6 +31,7 @@ export interface EditorState {
 
 export const defaultTransforms: Transforms = {
   rotation: 0,
+  freeRotation: 0,
   flipH: false,
   flipV: false,
 };

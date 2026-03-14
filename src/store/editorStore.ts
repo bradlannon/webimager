@@ -30,6 +30,7 @@ interface EditorStore {
   rotateRight: () => void;
   flipHorizontal: () => void;
   flipVertical: () => void;
+  setFreeRotation: (degrees: number) => void;
   setAdjustment: (key: keyof Omit<Adjustments, 'greyscale'>, value: number) => void;
   toggleGreyscale: () => void;
   resetAll: () => void;
@@ -106,6 +107,11 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     set((s) => ({
       transforms: { ...s.transforms, flipV: !s.transforms.flipV },
       cropRegion: s.cropRegion ? flipCropV(s.cropRegion) : null,
+    })),
+
+  setFreeRotation: (degrees) =>
+    set((s) => ({
+      transforms: { ...s.transforms, freeRotation: degrees },
     })),
 
   setAdjustment: (key, value) =>

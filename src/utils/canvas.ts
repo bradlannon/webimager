@@ -30,6 +30,19 @@ export function buildFilterString(adjustments: Adjustments): string {
   return parts.length > 0 ? parts.join(' ') : 'none';
 }
 
+/**
+ * Calculate bounding box dimensions after rotating a rectangle by an angle.
+ */
+function rotatedBounds(w: number, h: number, angleDeg: number): { width: number; height: number } {
+  const rad = (angleDeg * Math.PI) / 180;
+  const cos = Math.abs(Math.cos(rad));
+  const sin = Math.abs(Math.sin(rad));
+  return {
+    width: Math.ceil(w * cos + h * sin),
+    height: Math.ceil(w * sin + h * cos),
+  };
+}
+
 export function renderToCanvas(
   ctx: CanvasRenderingContext2D,
   source: ImageBitmap,
@@ -38,10 +51,15 @@ export function renderToCanvas(
   crop?: CropRegion,
   backgroundMask?: ImageData | null
 ): void {
-  const { rotation, flipH, flipV } = transforms;
+  const { rotation, freeRotation = 0, flipH, flipV } = transforms;
+  const totalRotation = rotation + freeRotation;
   const isRotated90 = rotation === 90 || rotation === 270;
-  const rotatedW = isRotated90 ? source.height : source.width;
-  const rotatedH = isRotated90 ? source.width : source.height;
+  const stepRotatedW = isRotated90 ? source.height : source.width;
+  const stepRotatedH = isRotated90 ? source.width : source.height;
+  // Bounding box after both 90° steps and free rotation
+  const { width: rotatedW, height: rotatedH } = freeRotation === 0
+    ? { width: stepRotatedW, height: stepRotatedH }
+    : rotatedBounds(stepRotatedW, stepRotatedH, freeRotation);
 
   // Check if crop is active and not the full image
   const hasCrop = crop && !(crop.x === 0 && crop.y === 0 && crop.width === 100 && crop.height === 100);
@@ -58,7 +76,7 @@ export function renderToCanvas(
 
     offCtx.save();
     offCtx.translate(rotatedW / 2, rotatedH / 2);
-    offCtx.rotate((rotation * Math.PI) / 180);
+    offCtx.rotate((totalRotation * Math.PI) / 180);
     offCtx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
     offCtx.drawImage(source, -source.width / 2, -source.height / 2);
     offCtx.restore();
@@ -89,7 +107,7 @@ export function renderToCanvas(
       const maskRotCtx = maskRotated.getContext('2d')!;
       maskRotCtx.save();
       maskRotCtx.translate(rotatedW / 2, rotatedH / 2);
-      maskRotCtx.rotate((rotation * Math.PI) / 180);
+      maskRotCtx.rotate((totalRotation * Math.PI) / 180);
       maskRotCtx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
       maskRotCtx.drawImage(maskSource, -source.width / 2, -source.height / 2);
       maskRotCtx.restore();
@@ -112,7 +130,7 @@ export function renderToCanvas(
     ctx.canvas.height = rotatedH;
     ctx.save();
     ctx.translate(rotatedW / 2, rotatedH / 2);
-    ctx.rotate((rotation * Math.PI) / 180);
+    ctx.rotate((totalRotation * Math.PI) / 180);
     ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
     if (adjustments) {
       ctx.filter = buildFilterString(adjustments);
@@ -135,7 +153,7 @@ export function renderToCanvas(
       const maskCtx = maskCanvas.getContext('2d')!;
       maskCtx.save();
       maskCtx.translate(rotatedW / 2, rotatedH / 2);
-      maskCtx.rotate((rotation * Math.PI) / 180);
+      maskCtx.rotate((totalRotation * Math.PI) / 180);
       maskCtx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
       maskCtx.drawImage(maskSource, -source.width / 2, -source.height / 2);
       maskCtx.restore();
