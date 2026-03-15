@@ -21,9 +21,9 @@ Requirements for v3.0 milestone. Each maps to roadmap phases.
 
 ### Text Overlay
 
-- [ ] **TEXT-01**: User can add text to the image with configurable font, size, and color
-- [ ] **TEXT-02**: User can drag text to reposition it on the canvas
-- [ ] **TEXT-03**: Text remains editable (move, edit content, change style) until user clicks "Apply"
+- [x] **TEXT-01**: User can add text to the image with configurable font, size, and color
+- [x] **TEXT-02**: User can drag text to reposition it on the canvas
+- [x] **TEXT-03**: Text remains editable (move, edit content, change style) until user clicks "Apply"
 - [ ] **TEXT-04**: Applied text is baked into the image and included in exports
 
 ### Drawing & Annotation
@@ -72,7 +72,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FILT-05 | Phase 11 | Complete |
 | COMPAT-01 | Phase 11 | Complete |
 | TEXT-01 | Phase 13 | In Progress |
-| TEXT-02 | Phase 13 | Pending |
+| TEXT-02 | Phase 13 | Complete |
 | TEXT-03 | Phase 13 | In Progress |
 | TEXT-04 | Phase 13 | In Progress |
 | DRAW-01 | Phase 14 | Pending |
