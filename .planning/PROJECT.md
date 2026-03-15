@@ -38,7 +38,16 @@ Users can quickly edit a photo and download the result without installing softwa
 
 ### Active
 
-(None — planning next milestone)
+- [ ] Blur and sharpen filters with intensity sliders
+- [ ] ~8-10 preset filters (sepia, vintage, warm, cool, B&W, fade, vivid, dramatic)
+- [ ] Simple text overlay with font, size, color, drag positioning (editable until applied)
+- [ ] Freehand drawing tool with color and thickness
+- [ ] Shape annotation (arrow, rectangle, circle, line) with color and thickness
+- [ ] Text and drawing elements editable until explicitly applied (match crop pattern)
+
+## Current Milestone: v3.0 Editing Power
+
+**Goal:** Add blur/sharpen sliders, ~8-10 preset filters, simple draggable text overlay, and basic freehand drawing + shape annotation — all editable-until-applied.
 
 ### Out of Scope
 
@@ -46,7 +55,7 @@ Users can quickly edit a photo and download the result without installing softwa
 - Batch processing — single image workflow
 - Backend processing — everything runs in-browser
 - Mobile-native app — web-only, responsive design
-- Layers / undo history stack — keep it simple
+- Full layer system with persistent editable objects — keep it simple (text/shapes use edit-until-apply pattern instead)
 - Server-side AI effects — violates client-only constraint (in-browser ML is allowed)
 - Manual mask painting/eraser — introduces layer-system complexity
 - Background image replacement — requires layer compositing
@@ -60,7 +69,8 @@ Users can quickly edit a photo and download the result without installing softwa
 - Inspired by DonsPhotoApp (native macOS/Swift app for simple photo processing)
 - Deployable as a static site (GitHub Pages, Netlify, Vercel) with zero infrastructure cost
 - AI model (~45MB) downloads on first use, cached by browser for subsequent sessions
-- Future candidates: blur/sharpen, preset filters (sepia, vintage, etc.), before/after comparison, edge feathering
+- v3.0: Blur/sharpen, preset filters, text overlay, drawing/annotation tools
+- Future candidates: before/after comparison, edge feathering, undo/redo history
 
 ## Constraints
 
@@ -93,4 +103,4 @@ Users can quickly edit a photo and download the result without installing softwa
 | translate-then-scale CSS transform | Simpler pan math in screen space | ✓ Good |
 
 ---
-*Last updated: 2026-03-15 after v2.0 milestone*
+*Last updated: 2026-03-15 after v3.0 milestone start*
