@@ -7,26 +7,30 @@ interface TextOverlayProps {
   canvasRect: { width: number; height: number };
 }
 
+const HANDLE_SIZE = 10;
+
 export function TextOverlay({ canvasRect }: TextOverlayProps) {
   const draftText = useEditorStore((s) => s.draftText);
   const sourceImage = useEditorStore((s) => s.sourceImage);
   const transforms = useEditorStore((s) => s.transforms);
   const cropRegion = useEditorStore((s) => s.cropRegion);
   const setDraftText = useEditorStore((s) => s.setDraftText);
+  const setDraftStyle = useEditorStore((s) => s.setDraftStyle);
   const applyText = useEditorStore((s) => s.applyText);
   const discardText = useEditorStore((s) => s.discardText);
 
   const dragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null);
+  const resizeRef = useRef<{ startX: number; startY: number; startFontSize: number } | null>(null);
   const textRef = useRef<HTMLDivElement>(null);
   const [snapX, setSnapX] = useState(false);
   const [snapY, setSnapY] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
 
   if (!draftText || !sourceImage) return null;
 
   // Compute post-crop source dimensions for font size scaling
   const isRotated90 = transforms.rotation === 90 || transforms.rotation === 270;
   const rotatedW = isRotated90 ? sourceImage.height : sourceImage.width;
-  const rotatedH = isRotated90 ? sourceImage.width : sourceImage.height;
   const crop = cropRegion;
   const postCropW = crop ? (crop.width / 100) * rotatedW : rotatedW;
 
@@ -46,7 +50,9 @@ export function TextOverlay({ canvasRect }: TextOverlayProps) {
   const fontWeight = draftText.style.bold ? 'bold' : 'normal';
   const fontStyle = draftText.style.italic ? 'italic' : 'normal';
 
+  // --- Drag handlers ---
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (isResizing) return;
     e.stopPropagation();
     e.preventDefault();
     (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
@@ -92,6 +98,45 @@ export function TextOverlay({ canvasRect }: TextOverlayProps) {
     setSnapY(false);
   };
 
+  // --- Resize handlers ---
+  const handleResizePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    e.preventDefault();
+    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+    setIsResizing(true);
+    resizeRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startFontSize: draftText.style.fontSize,
+    };
+  };
+
+  const handleResizePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!resizeRef.current) return;
+    e.stopPropagation();
+
+    // Use diagonal distance for proportional resize
+    const dx = e.clientX - resizeRef.current.startX;
+    const dy = e.clientY - resizeRef.current.startY;
+    // Diagonal movement: positive = bigger, negative = smaller
+    const diagonal = (dx + dy) / 2;
+
+    // Convert pixel delta to source-image font size change
+    // Scale: display pixels -> source image pixels
+    const scaleFactor = postCropW / canvasRect.width;
+    const fontDelta = diagonal * scaleFactor;
+
+    const newFontSize = Math.round(Math.max(8, Math.min(200, resizeRef.current.startFontSize + fontDelta)));
+    setDraftStyle({ fontSize: newFontSize });
+  };
+
+  const handleResizePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!resizeRef.current) return;
+    (e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId);
+    resizeRef.current = null;
+    setIsResizing(false);
+  };
+
   const handleApply = (e: React.PointerEvent | React.MouseEvent) => {
     e.stopPropagation();
     applyText();
@@ -101,6 +146,20 @@ export function TextOverlay({ canvasRect }: TextOverlayProps) {
     e.stopPropagation();
     discardText();
   };
+
+  // Resize handle style (shared for all corners)
+  const handleStyle = (cursor: string, extraStyle: React.CSSProperties): React.CSSProperties => ({
+    position: 'absolute',
+    width: HANDLE_SIZE,
+    height: HANDLE_SIZE,
+    backgroundColor: '#2A9D8F',
+    border: '1px solid white',
+    borderRadius: 2,
+    cursor,
+    pointerEvents: 'auto',
+    touchAction: 'none',
+    ...extraStyle,
+  });
 
   return (
     <div
@@ -158,6 +217,36 @@ export function TextOverlay({ canvasRect }: TextOverlayProps) {
         onPointerUp={handlePointerUp}
       >
         {draftText.content || '\u00A0'}
+
+        {/* Resize handles at corners */}
+        {/* Bottom-right (primary resize handle) */}
+        <div
+          style={handleStyle('nwse-resize', { right: -HANDLE_SIZE / 2, bottom: -HANDLE_SIZE / 2 })}
+          onPointerDown={handleResizePointerDown}
+          onPointerMove={handleResizePointerMove}
+          onPointerUp={handleResizePointerUp}
+        />
+        {/* Top-left */}
+        <div
+          style={handleStyle('nwse-resize', { left: -HANDLE_SIZE / 2, top: -HANDLE_SIZE / 2 })}
+          onPointerDown={handleResizePointerDown}
+          onPointerMove={handleResizePointerMove}
+          onPointerUp={handleResizePointerUp}
+        />
+        {/* Top-right */}
+        <div
+          style={handleStyle('nesw-resize', { right: -HANDLE_SIZE / 2, top: -HANDLE_SIZE / 2 })}
+          onPointerDown={handleResizePointerDown}
+          onPointerMove={handleResizePointerMove}
+          onPointerUp={handleResizePointerUp}
+        />
+        {/* Bottom-left */}
+        <div
+          style={handleStyle('nesw-resize', { left: -HANDLE_SIZE / 2, bottom: -HANDLE_SIZE / 2 })}
+          onPointerDown={handleResizePointerDown}
+          onPointerMove={handleResizePointerMove}
+          onPointerUp={handleResizePointerUp}
+        />
       </div>
 
       {/* Apply/Cancel buttons */}

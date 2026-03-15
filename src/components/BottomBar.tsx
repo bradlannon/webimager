@@ -113,12 +113,12 @@ export function BottomBar() {
 
   const enterCropMode = useEditorStore((s) => s.enterCropMode);
   const applyCrop = useEditorStore((s) => s.applyCrop);
-  const discardText = useEditorStore((s) => s.discardText);
+  const applyText = useEditorStore((s) => s.applyText);
 
   const handleTabClick = (tabId: TabId) => {
-    // Auto-discard unapplied text when switching away from text tab
+    // Auto-APPLY text when switching away from text tab (bake into image)
     if (textMode && tabId !== 'text') {
-      discardText();
+      applyText();
     }
     if (tabId === 'crop') {
       if (activeTab === 'crop') {
@@ -158,7 +158,7 @@ export function BottomBar() {
   return (
     <>
       {/* Overlay panel */}
-      <OverlayPanel open={activeTab !== null} onClose={handleClosePanel} disableBackdrop={activeTab === 'crop' || (activeTab === 'text' && textMode)}>
+      <OverlayPanel open={activeTab !== null} onClose={handleClosePanel} disableBackdrop={activeTab === 'crop'}>
         {activeTab && <PanelContent tabId={activeTab} bgRemoval={bgRemoval} />}
       </OverlayPanel>
 
