@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from 'vitest'
+import { describe, test, expect, beforeEach, vi } from 'vitest'
 import { useEditorStore } from '../store/editorStore'
 import { defaultAdjustments, defaultCrop } from '../types/editor'
 
@@ -348,6 +348,62 @@ describe('editorStore', () => {
       useEditorStore.setState({ replacementColor: '#ffffff' })
       useEditorStore.getState().resetAll()
       expect(useEditorStore.getState().replacementColor).toBeNull()
+    })
+  })
+
+  // applyResize background state clearing
+  describe('applyResize background state clearing', () => {
+    const mockMask = { data: new Uint8ClampedArray(4), width: 1, height: 1 } as unknown as ImageData
+
+    test('applyResize clears backgroundRemoved, backgroundMask, and replacementColor after resize', async () => {
+      // Mock createImageBitmap (browser API not available in jsdom) to return a minimal bitmap
+      const mockResizedBitmap = { close: vi.fn(), width: 50, height: 50 } as unknown as ImageBitmap
+      vi.stubGlobal('createImageBitmap', vi.fn().mockResolvedValue(mockResizedBitmap))
+
+      // Stub document.createElement so applyResize gets a working canvas mock.
+      // renderToCanvas sets ctx.canvas.width/height, so canvas must be a writable object
+      // referenced by ctx.canvas.
+      const mockCanvasDims = { width: 0, height: 0 }
+      const mockCtx = {
+        canvas: mockCanvasDims,
+        save: vi.fn(),
+        restore: vi.fn(),
+        translate: vi.fn(),
+        rotate: vi.fn(),
+        scale: vi.fn(),
+        drawImage: vi.fn(),
+        putImageData: vi.fn(),
+        fillRect: vi.fn(),
+        fillStyle: '',
+        filter: 'none',
+        globalCompositeOperation: 'source-over',
+      }
+      const mockCanvas = {
+        width: 0,
+        height: 0,
+        getContext: vi.fn(() => mockCtx),
+      }
+      vi.stubGlobal('document', {
+        createElement: vi.fn(() => mockCanvas),
+      })
+
+      // Provide a source image so applyResize does not bail early
+      const mockSourceBitmap = { close: vi.fn(), width: 100, height: 100 } as unknown as ImageBitmap
+      useEditorStore.setState({
+        sourceImage: mockSourceBitmap,
+        backgroundRemoved: true,
+        backgroundMask: mockMask,
+        replacementColor: '#ff0000',
+      })
+
+      await useEditorStore.getState().applyResize(50, 50)
+
+      const state = useEditorStore.getState()
+      expect(state.backgroundRemoved).toBe(false)
+      expect(state.backgroundMask).toBeNull()
+      expect(state.replacementColor).toBeNull()
+
+      vi.unstubAllGlobals()
     })
   })
 })

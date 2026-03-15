@@ -1,6 +1,10 @@
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { existsSync } from 'fs';
 import { resolve } from 'path';
+import { renderHook, act } from '@testing-library/react';
+import { useBackgroundRemoval } from '../hooks/useBackgroundRemoval';
+import { useEditorStore } from '../store/editorStore';
+import { defaultAdjustments } from '../types/editor';
 
 // Worker message protocol types (mirroring the worker's contract)
 type WorkerInMessage =
@@ -15,6 +19,59 @@ type WorkerOutMessage =
   | { type: 'inference-complete'; maskData: ImageData }
   | { type: 'error'; message: string }
   | { type: 'cancelled' };
+
+// BGREM-05: restoreBackground calls clearBackgroundMask which fully resets all background state
+describe('restoreBackground integration', () => {
+  beforeEach(() => {
+    // Mock Worker to avoid jsdom throwing on Web Worker construction
+    vi.stubGlobal('Worker', class {
+      onmessage: null = null;
+      onerror: null = null;
+      postMessage = vi.fn();
+      terminate = vi.fn();
+    });
+
+    // Reset store to a known state with background removal active
+    useEditorStore.setState({
+      sourceImage: null,
+      originalFile: null,
+      wasDownscaled: false,
+      transforms: { rotation: 0, flipH: false, flipV: false },
+      adjustments: { ...defaultAdjustments },
+      cropRegion: null,
+      cropMode: false,
+      backgroundRemoved: true,
+      backgroundMask: { data: new Uint8ClampedArray(4), width: 1, height: 1 } as unknown as ImageData,
+      replacementColor: '#ff0000',
+    });
+  });
+
+  test('restoreBackground clears backgroundRemoved, backgroundMask, and replacementColor', () => {
+    const { result } = renderHook(() => useBackgroundRemoval());
+
+    act(() => {
+      result.current.restoreBackground();
+    });
+
+    const state = useEditorStore.getState();
+    expect(state.backgroundRemoved).toBe(false);
+    expect(state.backgroundMask).toBeNull();
+    expect(state.replacementColor).toBeNull();
+  });
+
+  test('restoreBackground invokes clearBackgroundMask on the store (not toggleBackground)', () => {
+    const clearSpy = vi.spyOn(useEditorStore.getState(), 'clearBackgroundMask');
+
+    const { result } = renderHook(() => useBackgroundRemoval());
+
+    act(() => {
+      result.current.restoreBackground();
+    });
+
+    expect(clearSpy).toHaveBeenCalledOnce();
+    clearSpy.mockRestore();
+  });
+});
 
 describe('background removal worker', () => {
   test('worker file exists', () => {
