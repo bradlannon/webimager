@@ -123,7 +123,7 @@ Phases execute in numeric order: 11 -> 12 -> 13 -> 14
 | 10. Restore Status Fix | v2.0 | 1/1 | Complete | 2026-03-15 |
 | 11. Blur, Sharpen, Safari | v3.0 | 2/2 | Complete | 2026-03-15 |
 | 12. Preset Filters | v3.0 | 2/2 | Complete | 2026-03-15 |
-| 13. Text Overlay | 2/2 | Complete   | 2026-03-15 | - |
+| 13. Text Overlay | 2/2 | Complete    | 2026-03-15 | - |
 | 14. Drawing and Annotation | v3.0 | 0/TBD | Not started | - |
 
 ---
