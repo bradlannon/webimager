@@ -120,10 +120,24 @@ Plans:
 Plans:
 - [ ] 09-01-PLAN.md — Lift useBackgroundRemoval to persistent parent, remove dead code
 
+### Phase 10: Restore Status Fix & Final Cleanup
+**Goal:** Fix restoreBackground status desync so users can re-remove background after restoring, and remove orphaned drawCheckerboard export
+**Depends on:** Phase 9
+**Requirements**: BGREM-05
+**Gap Closure:** Closes gaps from v2.0 audit
+**Success Criteria** (what must be TRUE):
+  1. After clicking "Restore Background", the UI shows "Remove Background" button (not stuck on "Restore")
+  2. User can remove background, restore it, then remove again without page reload
+  3. No orphaned exports in src/utils/canvas.ts (drawCheckerboard removed)
+**Plans**: 1 plan
+
+Plans:
+- [ ] 10-01-PLAN.md — Fix restoreBackground status reset, remove drawCheckerboard dead export
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 4 → 5 → 6 → 7 → 8 → 9
+Phases execute in numeric order: 4 → 5 → 6 → 7 → 8 → 9 → 10
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -136,3 +150,4 @@ Phases execute in numeric order: 4 → 5 → 6 → 7 → 8 → 9
 | 7. Pan and Zoom | 2/2 | Complete   | 2026-03-14 | - |
 | 8. BG Removal Bug Fixes | 1/1 | Complete | 2026-03-14 | 2026-03-14 |
 | 9. Worker Lifecycle & Dead Code | 1/1 | Complete   | 2026-03-15 | - |
+| 10. Restore Status Fix & Cleanup | 0/1 | Pending | - | - |
