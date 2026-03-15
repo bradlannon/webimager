@@ -1,10 +1,10 @@
 import { Eraser, Undo2, AlertCircle, X, Loader2 } from 'lucide-react';
-import { useBackgroundRemoval } from '../hooks/useBackgroundRemoval';
+import type { useBackgroundRemoval } from '../hooks/useBackgroundRemoval';
 import { useEditorStore } from '../store/editorStore';
 
-export function BackgroundControls() {
+export function BackgroundControls({ bgRemoval }: { bgRemoval: ReturnType<typeof useBackgroundRemoval> }) {
   const { status, downloadProgress, error, requestRemoval, confirmDownload, cancel, restoreBackground } =
-    useBackgroundRemoval();
+    bgRemoval;
   const cropMode = useEditorStore((s) => s.cropMode);
   const backgroundRemoved = useEditorStore((s) => s.backgroundRemoved);
 

@@ -8,6 +8,7 @@ import { ResizeControls } from './ResizeControls';
 import { DownloadPanel } from './DownloadPanel';
 import { useEditorStore } from '../store/editorStore';
 import { CROP_PRESETS, constrainToAspectRatio } from '../utils/crop';
+import { useBackgroundRemoval } from '../hooks/useBackgroundRemoval';
 
 export type TabId = 'crop' | 'transform' | 'adjustments' | 'background' | 'resize' | 'download';
 
@@ -83,7 +84,7 @@ function CropPanel() {
   );
 }
 
-function PanelContent({ tabId }: { tabId: TabId }) {
+function PanelContent({ tabId, bgRemoval }: { tabId: TabId; bgRemoval: ReturnType<typeof useBackgroundRemoval> }) {
   switch (tabId) {
     case 'crop':
       return <CropPanel />;
@@ -92,7 +93,7 @@ function PanelContent({ tabId }: { tabId: TabId }) {
     case 'adjustments':
       return <AdjustmentControls />;
     case 'background':
-      return <BackgroundControls />;
+      return <BackgroundControls bgRemoval={bgRemoval} />;
     case 'resize':
       return <ResizeControls />;
     case 'download':
@@ -103,6 +104,7 @@ function PanelContent({ tabId }: { tabId: TabId }) {
 export function BottomBar() {
   const [activeTab, setActiveTab] = useState<TabId | null>(null);
   const cropMode = useEditorStore((s) => s.cropMode);
+  const bgRemoval = useBackgroundRemoval();
 
   const enterCropMode = useEditorStore((s) => s.enterCropMode);
   const applyCrop = useEditorStore((s) => s.applyCrop);
@@ -140,7 +142,7 @@ export function BottomBar() {
     <>
       {/* Overlay panel */}
       <OverlayPanel open={activeTab !== null} onClose={handleClosePanel} disableBackdrop={activeTab === 'crop'}>
-        {activeTab && <PanelContent tabId={activeTab} />}
+        {activeTab && <PanelContent tabId={activeTab} bgRemoval={bgRemoval} />}
       </OverlayPanel>
 
       {/* Tab bar — compact on mobile (icons only, 48px), full on desktop (icons + labels, 56px) */}
