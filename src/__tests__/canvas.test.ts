@@ -175,10 +175,12 @@ describe('buildFilterString', () => {
         contrast: 110,
         saturation: 80,
         greyscale: true,
-        blur: 0,
+        sepia: 50,
+        hueRotate: 15,
+        blur: 3,
         sharpen: 0,
       })
-    ).toBe('brightness(120%) contrast(110%) saturate(80%) grayscale(100%)')
+    ).toBe('brightness(120%) contrast(110%) saturate(80%) grayscale(100%) sepia(50%) hue-rotate(15deg) blur(3px)')
   })
 
   test('returns blur filter when blur > 0', () => {
@@ -197,5 +199,27 @@ describe('buildFilterString', () => {
     expect(
       buildFilterString({ ...defaultAdjustments, blur: 0, sharpen: 0 })
     ).toBe('none')
+  })
+
+  test('returns sepia filter when sepia > 0', () => {
+    expect(
+      buildFilterString({ ...defaultAdjustments, sepia: 80 })
+    ).toContain('sepia(80%)')
+  })
+
+  test('returns hue-rotate filter when hueRotate != 0', () => {
+    expect(
+      buildFilterString({ ...defaultAdjustments, hueRotate: -20 })
+    ).toContain('hue-rotate(-20deg)')
+  })
+
+  test('sepia=0 does not include sepia token', () => {
+    const result = buildFilterString({ ...defaultAdjustments, sepia: 0 })
+    expect(result).not.toContain('sepia')
+  })
+
+  test('hueRotate=0 does not include hue-rotate token', () => {
+    const result = buildFilterString({ ...defaultAdjustments, hueRotate: 0 })
+    expect(result).not.toContain('hue-rotate')
   })
 })

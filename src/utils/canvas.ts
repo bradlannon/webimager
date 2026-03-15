@@ -28,6 +28,8 @@ export function buildFilterString(adjustments: Adjustments): string {
   if (adjustments.contrast !== 100) parts.push(`contrast(${adjustments.contrast}%)`);
   if (adjustments.saturation !== 100) parts.push(`saturate(${adjustments.saturation}%)`);
   if (adjustments.greyscale) parts.push('grayscale(100%)');
+  if (adjustments.sepia > 0) parts.push(`sepia(${adjustments.sepia}%)`);
+  if (adjustments.hueRotate !== 0) parts.push(`hue-rotate(${adjustments.hueRotate}deg)`);
   if (adjustments.blur > 0) parts.push(`blur(${adjustments.blur}px)`);
   return parts.length > 0 ? parts.join(' ') : 'none';
 }

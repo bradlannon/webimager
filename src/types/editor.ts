@@ -10,8 +10,10 @@ export interface Adjustments {
   contrast: number;
   saturation: number;
   greyscale: boolean;
-  blur: number;     // 0-20 px radius
-  sharpen: number;  // 0-100 intensity
+  sepia: number;      // 0-100 percentage
+  hueRotate: number;  // degrees, -180 to 180
+  blur: number;       // 0-20 px radius
+  sharpen: number;    // 0-100 intensity
 }
 
 export const defaultAdjustments: Adjustments = {
@@ -19,6 +21,8 @@ export const defaultAdjustments: Adjustments = {
   contrast: 100,
   saturation: 100,
   greyscale: false,
+  sepia: 0,
+  hueRotate: 0,
   blur: 0,
   sharpen: 0,
 };
