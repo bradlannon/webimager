@@ -55,7 +55,11 @@ See: `.planning/milestones/v2.0-ROADMAP.md` for full details
   3. Blur and sharpen controls appear in the existing Adjustments panel (no new tab)
   4. All adjustments (brightness, contrast, saturation, blur, sharpen) produce correct visual results in Safari
   5. Exported images include blur/sharpen effects at full resolution
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 11-01-PLAN.md — Refactor renderToCanvas to options object + Safari polyfill
+- [ ] 11-02-PLAN.md — Add blur/sharpen sliders, convolution kernel, debounced UI
 
 Note: This phase includes a prerequisite refactor of `renderToCanvas` from positional parameters to an options object, preventing signature churn across subsequent phases.
 
@@ -109,7 +113,7 @@ Phases execute in numeric order: 11 -> 12 -> 13 -> 14
 | 8. BG Removal Bug Fixes | v2.0 | 1/1 | Complete | 2026-03-14 |
 | 9. Worker Lifecycle & Dead Code | v2.0 | 1/1 | Complete | 2026-03-15 |
 | 10. Restore Status Fix | v2.0 | 1/1 | Complete | 2026-03-15 |
-| 11. Blur, Sharpen, Safari | v3.0 | 0/TBD | Not started | - |
+| 11. Blur, Sharpen, Safari | v3.0 | 0/2 | Not started | - |
 | 12. Preset Filters | v3.0 | 0/TBD | Not started | - |
 | 13. Text Overlay | v3.0 | 0/TBD | Not started | - |
 | 14. Drawing and Annotation | v3.0 | 0/TBD | Not started | - |
