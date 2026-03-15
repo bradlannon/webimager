@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Crop, RotateCw, SlidersHorizontal, Eraser, Maximize, Download, Undo2, Type } from 'lucide-react';
 import { OverlayPanel } from './OverlayPanel';
 import { TransformControls } from './TransformControls';

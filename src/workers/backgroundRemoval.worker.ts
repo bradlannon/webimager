@@ -9,7 +9,7 @@ env.allowLocalModels = false;
 
 // Use single-threaded WASM to avoid SharedArrayBuffer requirement
 // (SharedArrayBuffer needs COOP/COEP headers which may not be available)
-env.backends.onnx.wasm.numThreads = 1;
+env.backends.onnx.wasm!.numThreads = 1;
 
 const MODEL_ID = 'briaai/RMBG-1.4';
 
@@ -38,7 +38,7 @@ self.onmessage = async (e: MessageEvent) => {
 
 async function loadModel() {
   model = await AutoModel.from_pretrained(MODEL_ID, {
-    config: { model_type: 'custom' },
+    config: { model_type: 'custom' } as any,
     progress_callback: (info: any) => {
       if (info.status === 'progress') {
         self.postMessage({

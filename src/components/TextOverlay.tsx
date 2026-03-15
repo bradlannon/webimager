@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState } from 'react';
 import { Check, X } from 'lucide-react';
 import { useEditorStore } from '../store/editorStore';
 import { dragDeltaToPercent, clampPosition, detectCenterSnap } from '../utils/text';

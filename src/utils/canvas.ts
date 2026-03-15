@@ -1,4 +1,4 @@
-import type { Transforms, Adjustments, CropRegion, RenderOptions, TextEntry } from '../types/editor';
+import type { Adjustments, RenderOptions, TextEntry } from '../types/editor';
 import { cropToPixels } from './crop';
 import { applySharpen } from './sharpen';
 

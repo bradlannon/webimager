@@ -22,8 +22,6 @@ export function Canvas() {
   const clearCrop = useEditorStore((s) => s.clearCrop);
   const zoomLevel = useEditorStore((s) => s.zoomLevel);
   const panOffset = useEditorStore((s) => s.panOffset);
-  const setZoom = useEditorStore((s) => s.setZoom);
-  const setPan = useEditorStore((s) => s.setPan);
   const resetView = useEditorStore((s) => s.resetView);
 
   const [isPanning, setIsPanning] = useState(false);
@@ -86,9 +84,6 @@ export function Canvas() {
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-
-    const currentZoom = useEditorStore.getState().zoomLevel;
-    const currentPan = useEditorStore.getState().panOffset;
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
