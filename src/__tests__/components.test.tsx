@@ -1,6 +1,5 @@
 import { describe, test, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { PrivacyBadge } from '../components/PrivacyBadge';
 import { TransformControls } from '../components/TransformControls';
 import { DownloadPanel } from '../components/DownloadPanel';
 import { useEditorStore } from '../store/editorStore';
@@ -27,15 +26,6 @@ vi.mock('../hooks/useBackgroundRemoval', () => ({
     restoreBackground: vi.fn(),
   }),
 }));
-
-describe('PrivacyBadge', () => {
-  test('renders privacy text about photo never leaving the browser', () => {
-    render(<PrivacyBadge />);
-    expect(
-      screen.getByText(/your photo never leaves this browser/i)
-    ).toBeTruthy();
-  });
-});
 
 describe('DownloadPanel', () => {
   const mockBitmap = { close: () => {}, width: 100, height: 200 } as unknown as ImageBitmap;

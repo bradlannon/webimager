@@ -289,14 +289,6 @@ describe('editorStore', () => {
       expect(state.backgroundRemoved).toBe(false)
     })
 
-    test('toggleBackground flips backgroundRemoved without changing backgroundMask', () => {
-      useEditorStore.setState({ backgroundMask: mockMask, backgroundRemoved: true })
-      useEditorStore.getState().toggleBackground()
-      const state = useEditorStore.getState()
-      expect(state.backgroundRemoved).toBe(false)
-      expect(state.backgroundMask).toBe(mockMask)
-    })
-
     test('resetAll clears backgroundRemoved and backgroundMask', () => {
       useEditorStore.setState({ backgroundMask: mockMask, backgroundRemoved: true })
       useEditorStore.getState().resetAll()

@@ -47,7 +47,6 @@ interface EditorStore {
   // Background removal actions
   setBackgroundMask: (mask: ImageData) => void;
   clearBackgroundMask: () => void;
-  toggleBackground: () => void;
   setReplacementColor: (color: string | null) => void;
 
   // Crop actions
@@ -162,7 +161,6 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 
   setBackgroundMask: (mask) => set({ backgroundMask: mask, backgroundRemoved: true }),
   clearBackgroundMask: () => set({ backgroundMask: null, backgroundRemoved: false, replacementColor: null }),
-  toggleBackground: () => set((s) => ({ backgroundRemoved: !s.backgroundRemoved })),
   setReplacementColor: (color) => set({ replacementColor: color }),
 
   enterCropMode: () =>

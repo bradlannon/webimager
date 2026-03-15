@@ -59,7 +59,7 @@ describe('restoreBackground integration', () => {
     expect(state.replacementColor).toBeNull();
   });
 
-  test('restoreBackground invokes clearBackgroundMask on the store (not toggleBackground)', () => {
+  test('restoreBackground invokes clearBackgroundMask on the store', () => {
     const clearSpy = vi.spyOn(useEditorStore.getState(), 'clearBackgroundMask');
 
     const { result } = renderHook(() => useBackgroundRemoval());
