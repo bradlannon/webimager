@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from 'vitest'
-import { limitSize, renderToCanvas, drawCheckerboard } from '../utils/canvas'
+import { limitSize, renderToCanvas } from '../utils/canvas'
 
 describe('limitSize', () => {
   test('image under 16,777,216 pixels returns original dimensions and wasDownscaled=false', () => {
@@ -102,22 +102,5 @@ describe('renderToCanvas', () => {
     const source = createMockSource(800, 600)
     renderToCanvas(ctx, source, { rotation: 0, flipH: false, flipV: true })
     expect(ctx.scale).toHaveBeenCalledWith(1, -1)
-  })
-})
-
-describe('drawCheckerboard', () => {
-  test('fills the entire canvas area with tiles', () => {
-    const fillRectCalls: Array<[number, number, number, number]> = []
-    const ctx = {
-      fillStyle: '',
-      fillRect: vi.fn((...args: [number, number, number, number]) => {
-        fillRectCalls.push(args)
-      }),
-    } as unknown as CanvasRenderingContext2D
-
-    drawCheckerboard(ctx, 16, 16, 8)
-
-    // 16x16 area with 8px tiles = 4 tiles total (2x2 grid)
-    expect(fillRectCalls.length).toBe(4)
   })
 })

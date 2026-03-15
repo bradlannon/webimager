@@ -167,19 +167,3 @@ export function renderToCanvas(
     }
   }
 }
-
-export function drawCheckerboard(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-  tileSize = 8
-): void {
-  const light = '#e5e5e5';
-  const dark = '#cccccc';
-  for (let y = 0; y < height; y += tileSize) {
-    for (let x = 0; x < width; x += tileSize) {
-      ctx.fillStyle = (x / tileSize + y / tileSize) % 2 === 0 ? light : dark;
-      ctx.fillRect(x, y, tileSize, tileSize);
-    }
-  }
-}
