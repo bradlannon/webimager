@@ -2,6 +2,54 @@
 
 *A living document updated after each milestone. Lessons feed forward into future planning.*
 
+## Milestone: v2.0 — AI Background Removal
+
+**Shipped:** 2026-03-15
+**Phases:** 7 | **Plans:** 12 (11 executed, 1 superseded) | **Tests:** 176
+
+### What Was Built
+- In-browser AI background removal with Web Worker (RMBG-1.4 via @huggingface/transformers)
+- Transparency-aware export pipeline (PNG auto-promotion, JPEG white-fill, format warnings)
+- Solid color background replacement with live canvas preview
+- Professional bottom bar UI with glassmorphism styling (replaced sidebar)
+- Cursor-centered zoom/pan (25%-300%) with floating glassmorphism controls
+- Worker lifecycle management: hook-in-persistent-parent pattern for tab switching resilience
+
+### What Worked
+- Milestone audit caught 3 real bugs (restore toggle, worker unmount, status desync) that would have shipped broken — the audit → gap-closure cycle is essential
+- Integration checker traced every requirement through its full wiring path, catching the status desync that phase-level verification missed
+- Web Worker architecture kept UI responsive during model download and inference — correct call from research phase
+- CSS checkerboard (instead of canvas-drawn) was the right approach — simpler and decoupled from render pipeline
+- Phase 6 sidebar redesign was a natural inflection point that improved the UX significantly
+- Small gap-closure phases (8, 9, 10) were fast to plan and execute — surgical fixes
+
+### What Was Inefficient
+- Phases 4-6 were executed before the verifier was integrated, requiring the audit to catch issues that would have been found earlier
+- Plan 04-03 was superseded by Phase 6 (sidebar redesign) — the initial plan assumed sidebar wiring that was replaced. Better to detect and skip superseded plans earlier
+- Three separate gap-closure phases (8, 9, 10) could have been a single phase with 3 plans — more overhead from phase-level verification × 3
+- ROADMAP.md progress table had inconsistent milestone column formatting throughout v2.0
+
+### Patterns Established
+- Hook-in-persistent-parent pattern: call hooks in the component that never unmounts, thread state via props
+- Integration checker as milestone gate: catches cross-phase wiring bugs that per-phase verification misses
+- destination-over compositing for background replacement (paint behind subject)
+- Native wheel event listeners for zoom (React 19 passive event workaround)
+- translate-then-scale CSS transform order for simpler pan math
+
+### Key Lessons
+1. Phase-level verification is necessary but not sufficient — integration checker catches the gaps between phases
+2. UI redesigns (Phase 6) can invalidate earlier plans — flag and skip superseded plans rather than executing stale ones
+3. Gap-closure phases should be batched into fewer, larger phases to reduce per-phase overhead
+4. The hook-in-persistent-parent pattern is the correct React pattern for background tasks that must survive component unmounting
+5. CSS-based visual indicators (checkerboard) should be preferred over canvas-drawn ones when they don't need to participate in the render pipeline
+
+### Cost Observations
+- Model mix: Quality profile (Opus for orchestration/execution, Sonnet for verification/checking)
+- Gap closure cycles: 3 phases across 2 audit rounds
+- Notable: Entire v2.0 milestone (7 phases, 12 plans) completed in ~2 days wall-clock time
+
+---
+
 ## Milestone: v1.0 — MVP
 
 **Shipped:** 2026-03-14
@@ -54,14 +102,18 @@
 | Milestone | Sessions | Phases | Key Change |
 |-----------|----------|--------|------------|
 | v1.0 | 2 | 3 | Initial project — established all patterns |
+| v2.0 | 3+ | 7 | Added milestone audit → gap-closure cycle; integration checker as quality gate |
 
 ### Cumulative Quality
 
 | Milestone | Tests | Zero-Dep Additions |
 |-----------|-------|-------------------|
 | v1.0 | 114 | 0 (only cropper.js was considered, then rejected) |
+| v2.0 | 176 | 1 (@huggingface/transformers — necessary for AI inference) |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Non-destructive pipelines scale well — each new feature plugs in without touching existing code
-2. Research before planning prevents wrong library choices (Cropper.js rejection saved significant rework)
+1. Non-destructive pipelines scale well — each new feature plugs in without touching existing code (v1.0 adjustments → v2.0 mask compositing)
+2. Research before planning prevents wrong library choices (Cropper.js rejection in v1.0, CSS checkerboard over canvas-drawn in v2.0)
+3. Integration checking catches bugs that per-component verification misses — essential at milestone boundaries
+4. Small, surgical gap-closure phases are effective but should be batched to reduce overhead

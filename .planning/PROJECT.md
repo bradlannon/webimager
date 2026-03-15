@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A browser-based image editing tool that lets anyone upload a photo, resize it, crop it with a free-drag selection, apply adjustments (brightness, contrast, saturation, greyscale), rotate/flip, and download the result. All processing happens client-side with GPU-accelerated canvas filters — no server required, no account needed.
+A browser-based image editing tool with AI-powered background removal. Users can upload a photo, remove the background with one click using in-browser AI, replace it with a solid color, adjust brightness/contrast/saturation, crop, resize, zoom/pan, and download the result. All processing happens client-side — no server required, no account needed.
 
 ## Core Value
 
@@ -26,10 +26,19 @@ Users can quickly edit a photo and download the result without installing softwa
 - ✓ Privacy indicator (photo never leaves browser) — v1.0
 - ✓ System-aware dark/light mode — v1.0
 - ✓ Responsive layout (sidebar → bottom bar on mobile) — v1.0
+- ✓ One-click AI background removal via in-browser RMBG-1.4 model — v2.0
+- ✓ Progress bar during model download and loading indicator during inference — v2.0
+- ✓ Restore original background with one click (remove/restore/re-remove cycle) — v2.0
+- ✓ Checkerboard transparency display — v2.0
+- ✓ Replace transparent background with solid color (white, black, custom) — v2.0
+- ✓ Transparency-aware export: PNG auto-promotion, JPEG white-fill, format warning — v2.0
+- ✓ Cursor-centered zoom/pan (25%-300%) with scroll wheel and trackpad pinch — v2.0
+- ✓ Floating glassmorphism zoom controls with percentage display — v2.0
+- ✓ Professional bottom bar UI with glassmorphism styling — v2.0
 
 ### Active
 
-- [ ] One-click AI-powered background removal (runs locally in-browser via WASM model)
+(None — planning next milestone)
 
 ### Out of Scope
 
@@ -39,16 +48,19 @@ Users can quickly edit a photo and download the result without installing softwa
 - Mobile-native app — web-only, responsive design
 - Layers / undo history stack — keep it simple
 - Server-side AI effects — violates client-only constraint (in-browser ML is allowed)
+- Manual mask painting/eraser — introduces layer-system complexity
+- Background image replacement — requires layer compositing
+- Offline mode — model download requires network on first use
 
 ## Context
 
-- Shipped v1.0 with 2,932 LOC TypeScript/React across 20+ source files
-- Tech stack: Vite 6.x, React, TypeScript, Tailwind CSS v4, Zustand, Canvas 2D API
-- 114 Vitest tests across 9 test files
+- Shipped v2.0 with 5,031 LOC TypeScript/React across 30+ source files
+- Tech stack: Vite 6.x, React, TypeScript, Tailwind CSS v4, Zustand, Canvas 2D API, @huggingface/transformers
+- 176 Vitest tests across 12+ test files
 - Inspired by DonsPhotoApp (native macOS/Swift app for simple photo processing)
 - Deployable as a static site (GitHub Pages, Netlify, Vercel) with zero infrastructure cost
-- v2.0: AI-powered background removal (in-browser ML model, ~10MB download on first use)
-- Future candidates: blur/sharpen, preset filters (sepia, vintage, etc.), before/after comparison
+- AI model (~45MB) downloads on first use, cached by browser for subsequent sessions
+- Future candidates: blur/sharpen, preset filters (sepia, vintage, etc.), before/after comparison, edge feathering
 
 ## Constraints
 
@@ -56,6 +68,7 @@ Users can quickly edit a photo and download the result without installing softwa
 - **Canvas limits**: Safari caps at 16.7M pixels — auto-downscale handles this
 - **Browser compat**: Modern browsers (Chrome, Firefox, Safari, Edge)
 - **Static deploy**: Deployable with no server runtime
+- **AI model size**: ~45MB first-use download, cached thereafter
 
 ## Key Decisions
 
@@ -69,7 +82,15 @@ Users can quickly edit a photo and download the result without installing softwa
 | Non-destructive pipeline | All edits as state parameters, re-render from source | ✓ Good |
 | createImageBitmap for resize | Browser-native GPU-accelerated, no library needed | ✓ Good |
 | Zustand over Context/Redux | Lightweight, selector-based re-renders, excellent TS support | ✓ Good |
-| Crop follows transforms | Coordinates transform with flip/rotate for correct region tracking | ✓ Good (bug found and fixed) |
+| Crop follows transforms | Coordinates transform with flip/rotate for correct region tracking | ✓ Good |
+| Web Worker for AI inference | Keeps UI thread responsive during model load and inference | ✓ Good |
+| @huggingface/transformers v3 + RMBG-1.4 | Best quality-to-size ratio for in-browser segmentation | ✓ Good |
+| destination-in compositing for mask | Clean alpha channel, no manual pixel manipulation | ✓ Good |
+| CSS checkerboard (not canvas-drawn) | Simpler, no render pipeline coupling, correct z-order | ✓ Good |
+| Bottom bar with glassmorphism | Professional look, matches bradlannon.ca, better mobile UX | ✓ Good |
+| Hook-in-persistent-parent pattern | useBackgroundRemoval in BottomBar survives tab switching | ✓ Good |
+| Native wheel event listener | React 19 passive events prevent preventDefault — native works | ✓ Good |
+| translate-then-scale CSS transform | Simpler pan math in screen space | ✓ Good |
 
 ---
-*Last updated: 2026-03-14 after v2.0 milestone start*
+*Last updated: 2026-03-15 after v2.0 milestone*
