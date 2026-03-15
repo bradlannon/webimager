@@ -1,10 +1,32 @@
-import { describe, test, expect, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, test, expect, beforeEach, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { PrivacyBadge } from '../components/PrivacyBadge';
 import { TransformControls } from '../components/TransformControls';
 import { DownloadPanel } from '../components/DownloadPanel';
 import { useEditorStore } from '../store/editorStore';
 import { defaultAdjustments } from '../types/editor';
+
+// Mock Canvas and ZoomControls to avoid canvas/ResizeObserver APIs in jsdom
+vi.mock('../components/Canvas', () => ({
+  Canvas: () => null,
+}));
+vi.mock('../components/ZoomControls', () => ({
+  ZoomControls: () => null,
+}));
+
+// Mock useBackgroundRemoval to avoid Web Worker creation in jsdom
+vi.mock('../hooks/useBackgroundRemoval', () => ({
+  useBackgroundRemoval: () => ({
+    status: 'idle',
+    downloadProgress: 0,
+    error: null,
+    modelCached: false,
+    requestRemoval: vi.fn(),
+    confirmDownload: vi.fn(),
+    cancel: vi.fn(),
+    restoreBackground: vi.fn(),
+  }),
+}));
 
 describe('PrivacyBadge', () => {
   test('renders privacy text about photo never leaving the browser', () => {
@@ -116,5 +138,215 @@ describe('TransformControls', () => {
   test('renders reset all button', () => {
     render(<TransformControls />);
     expect(screen.getByText(/reset all/i)).toBeTruthy();
+  });
+});
+
+// ─── Gap 1: UI-TOPBAR ────────────────────────────────────────────────────────
+describe('TopBar', () => {
+  // Import inside describe to use mocked modules
+  let TopBar: typeof import('../components/TopBar').TopBar;
+
+  beforeEach(async () => {
+    ({ TopBar } = await import('../components/TopBar'));
+    useEditorStore.setState({ wasDownscaled: false, sourceImage: null });
+  });
+
+  test('topbar_renders_portfolio_apps_and_av_nav_links', () => {
+    render(<TopBar />);
+    expect(screen.getByText('Portfolio')).toBeTruthy();
+    expect(screen.getByText('Apps')).toBeTruthy();
+    expect(screen.getByText('A/V')).toBeTruthy();
+  });
+
+  test('topbar_renders_new_image_action_button', () => {
+    render(<TopBar />);
+    // "New Image" text is hidden on mobile via Tailwind but present in DOM
+    expect(screen.getByTitle('New Image')).toBeTruthy();
+  });
+
+  test('topbar_renders_reset_all_action_button', () => {
+    render(<TopBar />);
+    expect(screen.getByTitle('Reset All')).toBeTruthy();
+  });
+});
+
+// ─── Gap 2: UI-BOTTOMBAR ─────────────────────────────────────────────────────
+describe('BottomBar', () => {
+  let BottomBar: typeof import('../components/BottomBar').BottomBar;
+
+  beforeEach(async () => {
+    ({ BottomBar } = await import('../components/BottomBar'));
+    useEditorStore.setState({ cropMode: false });
+  });
+
+  test('bottombar_renders_all_six_tab_labels', () => {
+    render(<BottomBar />);
+    // Labels exist in DOM even when hidden via md:block Tailwind class
+    expect(screen.getByText('Crop')).toBeTruthy();
+    expect(screen.getByText('Transform')).toBeTruthy();
+    expect(screen.getByText('Adjustments')).toBeTruthy();
+    expect(screen.getByText('Background')).toBeTruthy();
+    expect(screen.getByText('Resize')).toBeTruthy();
+    expect(screen.getByText('Download')).toBeTruthy();
+  });
+});
+
+// ─── Gap 3: UI-PANELS ────────────────────────────────────────────────────────
+describe('BottomBar panel toggle behavior', () => {
+  let BottomBar: typeof import('../components/BottomBar').BottomBar;
+  let AdjustmentControls: typeof import('../components/AdjustmentControls').AdjustmentControls;
+
+  beforeEach(async () => {
+    ({ BottomBar } = await import('../components/BottomBar'));
+    ({ AdjustmentControls } = await import('../components/AdjustmentControls'));
+    useEditorStore.setState({ cropMode: false });
+  });
+
+  test('clicking_adjustments_tab_opens_overlay_panel', () => {
+    render(<BottomBar />);
+    // OverlayPanel starts closed (opacity-0 / translate-y-full)
+    // Find the Adjustments tab button and click it
+    const adjustmentsBtn = screen.getByText('Adjustments').closest('button')!;
+    expect(adjustmentsBtn).toBeTruthy();
+    fireEvent.click(adjustmentsBtn);
+    // After clicking, panel content (AdjustmentControls) should be in the DOM
+    expect(screen.getByText('Brightness')).toBeTruthy();
+  });
+
+  test('clicking_active_tab_again_closes_the_panel', () => {
+    render(<BottomBar />);
+    const adjustmentsBtn = screen.getByText('Adjustments').closest('button')!;
+    // Open the panel
+    fireEvent.click(adjustmentsBtn);
+    expect(screen.getByText('Brightness')).toBeTruthy();
+    // Close by clicking the same tab again
+    fireEvent.click(adjustmentsBtn);
+    // After closing, Brightness should no longer be rendered (panel is null)
+    expect(screen.queryByText('Brightness')).toBeNull();
+  });
+
+  test('clicking_different_tab_switches_panel_content', () => {
+    render(<BottomBar />);
+    const adjustmentsBtn = screen.getByText('Adjustments').closest('button')!;
+    const downloadBtn = screen.getByText('Download').closest('button')!;
+    // Open Adjustments panel
+    fireEvent.click(adjustmentsBtn);
+    expect(screen.getByText('Brightness')).toBeTruthy();
+    // Switch to Download panel directly
+    fireEvent.click(downloadBtn);
+    // Adjustments content is gone, Download content appears
+    expect(screen.queryByText('Brightness')).toBeNull();
+    // DownloadPanel renders PNG and JPEG buttons
+    expect(screen.getByText(/PNG/i)).toBeTruthy();
+  });
+});
+
+// ─── Gap 4: UI-LAYOUT-REWIRE ─────────────────────────────────────────────────
+describe('Editor layout', () => {
+  let Editor: typeof import('../components/Editor').Editor;
+
+  beforeEach(async () => {
+    ({ Editor } = await import('../components/Editor'));
+    useEditorStore.setState({ cropMode: false, sourceImage: null });
+    // jsdom does not implement ResizeObserver — polyfill it for Editor tests
+    if (!('ResizeObserver' in globalThis)) {
+      (globalThis as Record<string, unknown>).ResizeObserver = class ResizeObserver {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      };
+    }
+  });
+
+  test('editor_renders_topbar_component', () => {
+    render(<Editor />);
+    // TopBar renders Portfolio/Apps/A/V links
+    expect(screen.getByText('Portfolio')).toBeTruthy();
+  });
+
+  test('editor_renders_bottombar_component', () => {
+    render(<Editor />);
+    // BottomBar renders its 6 tabs
+    expect(screen.getByText('Crop')).toBeTruthy();
+    expect(screen.getByText('Download')).toBeTruthy();
+  });
+
+  test('editor_does_not_render_sidebar', () => {
+    render(<Editor />);
+    // Sidebar was deleted — no sidebar landmark or "sidebar" text
+    expect(document.querySelector('[data-testid="sidebar"]')).toBeNull();
+    // Sidebar had tool sections — verify none of the old sidebar-specific labels appear
+    // The old Sidebar used "Crop", "Transform" etc as section headings — but those now only
+    // appear in BottomBar tabs (which is the new design). We verify no <aside> element.
+    expect(document.querySelector('aside')).toBeNull();
+  });
+});
+
+// ─── Gap 5: UI-PANEL-CONTENT ─────────────────────────────────────────────────
+describe('BottomBar panel content routing', () => {
+  let BottomBar: typeof import('../components/BottomBar').BottomBar;
+
+  beforeEach(async () => {
+    ({ BottomBar } = await import('../components/BottomBar'));
+    useEditorStore.setState({ cropMode: false, sourceImage: null });
+  });
+
+  test('adjustments_tab_renders_adjustment_controls', () => {
+    render(<BottomBar />);
+    fireEvent.click(screen.getByText('Adjustments').closest('button')!);
+    // AdjustmentControls renders Brightness, Contrast, Saturation sliders
+    expect(screen.getByText('Brightness')).toBeTruthy();
+    expect(screen.getByText('Contrast')).toBeTruthy();
+    expect(screen.getByText('Saturation')).toBeTruthy();
+  });
+
+  test('transform_tab_renders_transform_controls', () => {
+    render(<BottomBar />);
+    fireEvent.click(screen.getByText('Transform').closest('button')!);
+    // TransformControls renders rotate/flip buttons
+    expect(screen.getByLabelText(/rotate left/i)).toBeTruthy();
+  });
+
+  test('background_tab_renders_background_controls', () => {
+    render(<BottomBar />);
+    fireEvent.click(screen.getByText('Background').closest('button')!);
+    // BackgroundControls in idle state renders "Remove Background" button
+    expect(screen.getByText(/remove background/i)).toBeTruthy();
+  });
+
+  test('download_tab_renders_download_panel', () => {
+    render(<BottomBar />);
+    fireEvent.click(screen.getByText('Download').closest('button')!);
+    // DownloadPanel renders PNG and JPEG buttons
+    expect(screen.getByText(/PNG/)).toBeTruthy();
+    expect(screen.getByText(/JPEG/)).toBeTruthy();
+  });
+});
+
+// ─── Gap 6: UI-CROP-PANEL ────────────────────────────────────────────────────
+describe('BottomBar crop tab enters crop mode', () => {
+  let BottomBar: typeof import('../components/BottomBar').BottomBar;
+
+  beforeEach(async () => {
+    ({ BottomBar } = await import('../components/BottomBar'));
+    // Reset store to known state with no active crop
+    useEditorStore.setState({ cropMode: false, cropRegion: null });
+  });
+
+  test('clicking_crop_tab_calls_enterCropMode_in_store', () => {
+    const enterCropModeSpy = vi.spyOn(useEditorStore.getState(), 'enterCropMode');
+    render(<BottomBar />);
+    const cropBtn = screen.getByText('Crop').closest('button')!;
+    fireEvent.click(cropBtn);
+    expect(enterCropModeSpy).toHaveBeenCalledOnce();
+    enterCropModeSpy.mockRestore();
+  });
+
+  test('clicking_crop_tab_sets_cropMode_to_true_in_store', () => {
+    render(<BottomBar />);
+    expect(useEditorStore.getState().cropMode).toBe(false);
+    const cropBtn = screen.getByText('Crop').closest('button')!;
+    fireEvent.click(cropBtn);
+    expect(useEditorStore.getState().cropMode).toBe(true);
   });
 });
