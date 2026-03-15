@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: AI Background Removal
 status: completed
 stopped_at: Completed 08-01 Background Removal Bug Fixes (Phase 8 complete, all gaps closed)
-last_updated: "2026-03-14T23:27:48.042Z"
+last_updated: "2026-03-15T00:32:41.160Z"
 last_activity: 2026-03-14 — Completed 08-01 Background Removal Bug Fixes
 progress:
-  total_phases: 5
-  completed_phases: 4
-  total_plans: 10
-  completed_plans: 9
+  total_phases: 6
+  completed_phases: 5
+  total_plans: 11
+  completed_plans: 10
   percent: 100
 ---
 
@@ -21,21 +21,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-14)
 
 **Core value:** Users can quickly edit a photo and download the result without installing software, creating an account, or uploading to a server.
-**Current focus:** Phase 8: Background Removal Bug Fixes (gap closure)
+**Current focus:** Phase 9: Worker Lifecycle and Dead Code Cleanup (complete)
 
 ## Current Position
 
-Phase: 8 (Background Removal Bug Fixes)
+Phase: 9 (Worker Lifecycle and Dead Code Cleanup)
 Plan: 1 of 1 in current phase
-Status: Completed 08-01 (Phase 8 complete, all gaps closed)
-Last activity: 2026-03-14 — Completed 08-01 Background Removal Bug Fixes
+Status: Completed 09-01 (Phase 9 complete)
+Last activity: 2026-03-14 — Completed 09-01 Worker Lifecycle and Dead Code Cleanup
 
 Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 17 (8 v1.0 + 9 v2.0)
+- Total plans completed: 18 (8 v1.0 + 10 v2.0)
 - Average duration: 6.5min
 - Total execution time: 1.75 hours
 
@@ -51,9 +51,10 @@ Progress: [██████████] 100%
 | 05-export-bg-replace | 2/2 | 6min | 3min |
 | 07-pan-and-zoom | 2/2 | 4min | 2min |
 | 08-bg-removal-fixes | 1/1 | 1min | 1min |
+| 09-worker-lifecycle-cleanup | 1/1 | 2min | 2min |
 
 **Recent Trend:**
-- Last 5 plans: 2min, 4min, 3min, 1min, 1min
+- Last 5 plans: 4min, 3min, 1min, 1min, 2min
 - Trend: Consistently fast execution
 
 *Updated after each plan completion*
@@ -62,6 +63,7 @@ Progress: [██████████] 100%
 | Phase 07 P01 | 3min | 2 tasks | 4 files |
 | Phase 07 P02 | 1min | 2 tasks | 5 files |
 | Phase 08 P01 | 1min | 2 tasks | 4 files |
+| Phase 09 P01 | 2min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -93,6 +95,7 @@ Recent decisions affecting current work:
 - [07-02]: ZoomControls uses containerRect prop for center-point zoom on button clicks
 - [07-02]: Previous zoom/pan saved in ref for percentage-text toggle behavior
 - [07-02]: CSS transition on transform only for button-initiated zooms via isButtonZoom ref
+- [09-01]: useBackgroundRemoval lifted to BottomBar and threaded via props through PanelContent to BackgroundControls (hook-in-persistent-parent pattern)
 
 ### Roadmap Evolution
 
@@ -108,6 +111,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-14T23:23:21Z
-Stopped at: Completed 08-01 Background Removal Bug Fixes (Phase 8 complete, all gaps closed)
-Resume file: .planning/phases/08-background-removal-bug-fixes/08-01-SUMMARY.md
+Last session: 2026-03-15T00:32:03Z
+Stopped at: Completed 09-01 Worker Lifecycle and Dead Code Cleanup (Phase 9 complete)
+Resume file: .planning/phases/09-worker-lifecycle-dead-code-cleanup/09-01-SUMMARY.md
