@@ -2,6 +2,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { useRenderPipeline } from '../hooks/useRenderPipeline';
 import { useEditorStore } from '../store/editorStore';
 import { CropOverlay } from './CropOverlay';
+import { TextOverlay } from './TextOverlay';
 import { zoomAtPoint, clampZoom, isSmoothZoom } from '../utils/zoom';
 
 export function Canvas() {
@@ -11,6 +12,8 @@ export function Canvas() {
   const sourceImage = useEditorStore((s) => s.sourceImage);
   const transforms = useEditorStore((s) => s.transforms);
   const cropMode = useEditorStore((s) => s.cropMode);
+  const textMode = useEditorStore((s) => s.textMode);
+  const draftText = useEditorStore((s) => s.draftText);
   const cropRegion = useEditorStore((s) => s.cropRegion);
   const cropAspectRatio = useEditorStore((s) => s.cropAspectRatio);
   const setCrop = useEditorStore((s) => s.setCrop);
@@ -199,6 +202,7 @@ export function Canvas() {
   // Pointer event handlers for panning
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     const state = useEditorStore.getState();
+    if (state.textMode) return; // Disable pan during text editing
     if (state.zoomLevel <= 1) return; // No pan at fit-to-view
 
     (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
@@ -313,6 +317,9 @@ export function Canvas() {
             onApply={applyCrop}
             onCancel={handleCancel}
           />
+        )}
+        {textMode && draftText && (
+          <TextOverlay canvasRect={canvasRect} />
         )}
       </div>
     </div>

@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
-import { Crop, RotateCw, SlidersHorizontal, Eraser, Maximize, Download, Undo2 } from 'lucide-react';
+import { Crop, RotateCw, SlidersHorizontal, Eraser, Maximize, Download, Undo2, Type } from 'lucide-react';
 import { OverlayPanel } from './OverlayPanel';
 import { TransformControls } from './TransformControls';
 import { AdjustmentControls } from './AdjustmentControls';
 import { BackgroundControls } from './BackgroundControls';
 import { ResizeControls } from './ResizeControls';
 import { DownloadPanel } from './DownloadPanel';
+import { TextControls } from './TextControls';
 import { useEditorStore } from '../store/editorStore';
 import { CROP_PRESETS, constrainToAspectRatio } from '../utils/crop';
 import { useBackgroundRemoval } from '../hooks/useBackgroundRemoval';
 
-export type TabId = 'crop' | 'transform' | 'adjustments' | 'background' | 'resize' | 'download';
+export type TabId = 'crop' | 'transform' | 'adjustments' | 'background' | 'resize' | 'text' | 'download';
 
 interface Tab {
   id: TabId;
@@ -24,6 +25,7 @@ const tabs: Tab[] = [
   { id: 'adjustments', label: 'Adjustments', icon: SlidersHorizontal },
   { id: 'background', label: 'Background', icon: Eraser },
   { id: 'resize', label: 'Resize', icon: Maximize },
+  { id: 'text', label: 'Text', icon: Type },
   { id: 'download', label: 'Download', icon: Download },
 ];
 
@@ -96,6 +98,8 @@ function PanelContent({ tabId, bgRemoval }: { tabId: TabId; bgRemoval: ReturnTyp
       return <BackgroundControls bgRemoval={bgRemoval} />;
     case 'resize':
       return <ResizeControls />;
+    case 'text':
+      return <TextControls />;
     case 'download':
       return <DownloadPanel />;
   }
@@ -104,12 +108,18 @@ function PanelContent({ tabId, bgRemoval }: { tabId: TabId; bgRemoval: ReturnTyp
 export function BottomBar() {
   const [activeTab, setActiveTab] = useState<TabId | null>(null);
   const cropMode = useEditorStore((s) => s.cropMode);
+  const textMode = useEditorStore((s) => s.textMode);
   const bgRemoval = useBackgroundRemoval();
 
   const enterCropMode = useEditorStore((s) => s.enterCropMode);
   const applyCrop = useEditorStore((s) => s.applyCrop);
+  const discardText = useEditorStore((s) => s.discardText);
 
   const handleTabClick = (tabId: TabId) => {
+    // Auto-discard unapplied text when switching away from text tab
+    if (textMode && tabId !== 'text') {
+      discardText();
+    }
     if (tabId === 'crop') {
       if (activeTab === 'crop') {
         // Closing crop panel — auto-save and exit crop mode
@@ -134,6 +144,10 @@ export function BottomBar() {
     // If closing crop panel via backdrop tap, auto-save
     if (activeTab === 'crop' && cropMode) {
       applyCrop();
+    }
+    // Auto-discard text when closing panel via backdrop
+    if (textMode) {
+      discardText();
     }
     setActiveTab(null);
   };
