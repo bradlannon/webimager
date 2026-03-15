@@ -17,7 +17,7 @@ Requirements for v3.0 milestone. Each maps to roadmap phases.
 
 ### Compatibility
 
-- [ ] **COMPAT-01**: All adjustments (brightness, contrast, saturation, blur, presets) work correctly in Safari (fix ctx.filter gap)
+- [x] **COMPAT-01**: All adjustments (brightness, contrast, saturation, blur, presets) work correctly in Safari (fix ctx.filter gap)
 
 ### Text Overlay
 
@@ -70,7 +70,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FILT-03 | Phase 12 | Pending |
 | FILT-04 | Phase 12 | Pending |
 | FILT-05 | Phase 11 | Pending |
-| COMPAT-01 | Phase 11 | Pending |
+| COMPAT-01 | Phase 11 | Complete |
 | TEXT-01 | Phase 13 | Pending |
 | TEXT-02 | Phase 13 | Pending |
 | TEXT-03 | Phase 13 | Pending |
