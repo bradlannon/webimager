@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { Transforms, Adjustments, CropRegion } from '../types/editor';
 import { defaultTransforms, defaultAdjustments, defaultCrop } from '../types/editor';
 import { clampCrop, flipCropH, flipCropV, rotateCropCW, rotateCropCCW } from '../utils/crop';
+import { PRESETS } from '../utils/presets';
 
 interface EditorStore {
   // Image state
@@ -14,6 +15,7 @@ interface EditorStore {
 
   // Adjustment state
   adjustments: Adjustments;
+  activePreset: string | null;
 
   // Crop state
   cropRegion: CropRegion | null;
@@ -42,6 +44,7 @@ interface EditorStore {
   setFreeRotation: (degrees: number) => void;
   setAdjustment: (key: keyof Omit<Adjustments, 'greyscale'>, value: number) => void;
   toggleGreyscale: () => void;
+  setPreset: (presetId: string | null) => void;
   resetAll: () => void;
 
   // Background removal actions
@@ -66,6 +69,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   wasDownscaled: false,
   transforms: { ...defaultTransforms },
   adjustments: { ...defaultAdjustments },
+  activePreset: null,
   cropRegion: null,
   previousCropRegion: null,
   cropMode: false,
@@ -89,6 +93,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       wasDownscaled,
       transforms: { ...defaultTransforms },
       adjustments: { ...defaultAdjustments },
+      activePreset: null,
       cropRegion: null,
       cropMode: false,
       cropAspectRatio: null,
@@ -138,16 +143,30 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   setAdjustment: (key, value) =>
     set((s) => ({
       adjustments: { ...s.adjustments, [key]: value },
+      activePreset: null,
     })),
 
   toggleGreyscale: () =>
     set((s) => ({
       adjustments: { ...s.adjustments, greyscale: !s.adjustments.greyscale },
+      activePreset: null,
     })),
+
+  setPreset: (presetId) => {
+    if (presetId === null || presetId === 'none') {
+      set({ adjustments: { ...defaultAdjustments }, activePreset: null });
+    } else {
+      const preset = PRESETS.find((p) => p.id === presetId);
+      if (preset) {
+        set({ adjustments: { ...preset.adjustments }, activePreset: presetId });
+      }
+    }
+  },
 
   resetAll: () => set({
     transforms: { ...defaultTransforms },
     adjustments: { ...defaultAdjustments },
+    activePreset: null,
     cropRegion: null,
     previousCropRegion: null,
     cropMode: false,

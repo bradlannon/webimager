@@ -370,6 +370,65 @@ describe('editorStore', () => {
     })
   })
 
+  describe('preset selection', () => {
+    test('initial activePreset is null', () => {
+      expect(useEditorStore.getState().activePreset).toBeNull()
+    })
+
+    test('setPreset("sepia") sets adjustments to sepia preset values and activePreset to "sepia"', () => {
+      useEditorStore.getState().setPreset('sepia')
+      const state = useEditorStore.getState()
+      expect(state.activePreset).toBe('sepia')
+      expect(state.adjustments.sepia).toBe(80)
+      expect(state.adjustments.contrast).toBe(90)
+      expect(state.adjustments.saturation).toBe(60)
+    })
+
+    test('setPreset("none") sets adjustments to defaults and activePreset to null', () => {
+      useEditorStore.getState().setPreset('sepia')
+      useEditorStore.getState().setPreset('none')
+      const state = useEditorStore.getState()
+      expect(state.activePreset).toBeNull()
+      expect(state.adjustments).toEqual(defaultAdjustments)
+    })
+
+    test('setPreset(null) sets adjustments to defaults and activePreset to null', () => {
+      useEditorStore.getState().setPreset('vivid')
+      useEditorStore.getState().setPreset(null)
+      const state = useEditorStore.getState()
+      expect(state.activePreset).toBeNull()
+      expect(state.adjustments).toEqual(defaultAdjustments)
+    })
+
+    test('setAdjustment clears activePreset to null after preset selection', () => {
+      useEditorStore.getState().setPreset('vivid')
+      expect(useEditorStore.getState().activePreset).toBe('vivid')
+      useEditorStore.getState().setAdjustment('brightness', 120)
+      expect(useEditorStore.getState().activePreset).toBeNull()
+    })
+
+    test('toggleGreyscale clears activePreset to null after preset selection', () => {
+      useEditorStore.getState().setPreset('vivid')
+      expect(useEditorStore.getState().activePreset).toBe('vivid')
+      useEditorStore.getState().toggleGreyscale()
+      expect(useEditorStore.getState().activePreset).toBeNull()
+    })
+
+    test('resetAll sets activePreset to null', () => {
+      useEditorStore.getState().setPreset('sepia')
+      useEditorStore.getState().resetAll()
+      expect(useEditorStore.getState().activePreset).toBeNull()
+    })
+
+    test('setImage sets activePreset to null', () => {
+      useEditorStore.getState().setPreset('warm')
+      const mockBitmap = { close: () => {}, width: 100, height: 200 } as unknown as ImageBitmap
+      const mockFile = new File([''], 'test.jpg', { type: 'image/jpeg' })
+      useEditorStore.getState().setImage(mockBitmap, mockFile, false)
+      expect(useEditorStore.getState().activePreset).toBeNull()
+    })
+  })
+
   // applyResize background state clearing
   describe('applyResize background state clearing', () => {
     const mockMask = { data: new Uint8ClampedArray(4), width: 1, height: 1 } as unknown as ImageData
