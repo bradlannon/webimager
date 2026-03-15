@@ -71,10 +71,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FILT-04 | Phase 12 | Complete |
 | FILT-05 | Phase 11 | Complete |
 | COMPAT-01 | Phase 11 | Complete |
-| TEXT-01 | Phase 13 | Pending |
+| TEXT-01 | Phase 13 | In Progress |
 | TEXT-02 | Phase 13 | Pending |
-| TEXT-03 | Phase 13 | Pending |
-| TEXT-04 | Phase 13 | Pending |
+| TEXT-03 | Phase 13 | In Progress |
+| TEXT-04 | Phase 13 | In Progress |
 | DRAW-01 | Phase 14 | Pending |
 | DRAW-02 | Phase 14 | Pending |
 | DRAW-03 | Phase 14 | Pending |

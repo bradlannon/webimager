@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Editing Power
-status: completed
-stopped_at: Phase 13 context gathered
-last_updated: "2026-03-15T04:13:27.380Z"
-last_activity: 2026-03-15 — Completed 12-02 (preset grid UI)
+status: in-progress
+stopped_at: Completed 13-01-PLAN.md
+last_updated: "2026-03-15T04:39:37Z"
+last_activity: 2026-03-15 — Completed 13-01 (text overlay data layer)
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 4
-  completed_plans: 4
-  percent: 100
+  completed_plans: 5
+  percent: 90
 ---
 
 # Project State
@@ -21,21 +21,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-15)
 
 **Core value:** Users can quickly edit a photo and download the result without installing software, creating an account, or uploading to a server.
-**Current focus:** Phase 12 — Preset Filters
+**Current focus:** Phase 13 — Text Overlay
 
 ## Current Position
 
-Phase: 12 of 14 (Preset Filters)
-Plan: 2 of 2 (12-02 complete)
-Status: Phase 12 complete
-Last activity: 2026-03-15 — Completed 12-02 (preset grid UI)
+Phase: 13 of 14 (Text Overlay)
+Plan: 1 of 2 (13-01 complete)
+Status: In progress
+Last activity: 2026-03-15 — Completed 13-01 (text overlay data layer)
 
-Progress: [██████████] 100%
+Progress: [█████████░] 90%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 23 (8 v1.0 + 11 v2.0 + 4 v3.0)
+- Total plans completed: 24 (8 v1.0 + 11 v2.0 + 5 v3.0)
 - Average duration: 6.5min
 - Total execution time: 1.75 hours
 
@@ -55,6 +55,7 @@ Progress: [██████████] 100%
 | 10-restore-status | 1/1 | 1min | 1min |
 | 11-blur-sharpen-safari | 2/2 | 5min | 2.5min |
 | 12-preset-filters | 2/2 | 4min | 2min |
+| 13-text-overlay | 1/2 | 4min | 4min |
 
 **Recent Trend:**
 - Last 5 plans: 1min, 2min, 3min, 3min, 1min
@@ -80,6 +81,9 @@ Recent decisions affecting current work:
 - [12-01]: presetToCssFilter excludes sharpen (CSS filter cannot express convolution)
 - [12-01]: Manual slider change clears activePreset to indicate custom state
 - [Phase 12-02]: Thumbnail generated as 64px JPEG data URL via offscreen canvas for preset previews
+- [13-01]: Text positions stored as 0-100 percentage of post-crop canvas dimensions
+- [13-01]: resetAll preserves bakedTexts; setImage clears all text state
+- [13-01]: bakeTexts helper extracts text rendering to avoid duplication in crop/no-crop paths
 
 ### Pending Todos
 
@@ -91,6 +95,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-15T04:13:27.374Z
-Stopped at: Phase 13 context gathered
-Resume file: .planning/phases/13-text-overlay/13-CONTEXT.md
+Last session: 2026-03-15T04:39:37Z
+Stopped at: Completed 13-01-PLAN.md
+Resume file: .planning/phases/13-text-overlay/13-02-PLAN.md

@@ -90,7 +90,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 13-01-PLAN.md — Text types, store state, constants, and canvas baking pipeline
+- [x] 13-01-PLAN.md — Text types, store state, constants, and canvas baking pipeline
 - [ ] 13-02-PLAN.md — TextOverlay and TextControls components, BottomBar/Canvas integration
 
 ### Phase 14: Drawing and Annotation
@@ -123,7 +123,7 @@ Phases execute in numeric order: 11 -> 12 -> 13 -> 14
 | 10. Restore Status Fix | v2.0 | 1/1 | Complete | 2026-03-15 |
 | 11. Blur, Sharpen, Safari | v3.0 | 2/2 | Complete | 2026-03-15 |
 | 12. Preset Filters | v3.0 | 2/2 | Complete | 2026-03-15 |
-| 13. Text Overlay | v3.0 | 0/2 | Not started | - |
+| 13. Text Overlay | v3.0 | 1/2 | In progress | - |
 | 14. Drawing and Annotation | v3.0 | 0/TBD | Not started | - |
 
 ---
