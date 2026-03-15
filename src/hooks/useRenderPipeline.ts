@@ -31,7 +31,7 @@ export function useRenderPipeline(canvasRef: RefObject<HTMLCanvasElement | null>
     const activeReplacementColor = backgroundRemoved ? replacementColor : undefined;
 
     // Render the image with transforms, adjustments, optional crop, optional mask, and replacement color
-    renderToCanvas(ctx, sourceImage, transforms, adjustments, activeCrop, activeMask, activeReplacementColor);
+    renderToCanvas(ctx, sourceImage, { transforms, adjustments, crop: activeCrop, backgroundMask: activeMask, replacementColor: activeReplacementColor });
 
     // Draw checkerboard behind image on a separate pass
     // (The checkerboard is drawn underneath via CSS or a background canvas)

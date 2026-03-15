@@ -55,7 +55,7 @@ describe('renderToCanvas', () => {
   test('with rotation=0, flipH=false, flipV=false, canvas dimensions match source', () => {
     const { ctx, canvas } = createMockContext()
     const source = createMockSource(800, 600)
-    renderToCanvas(ctx, source, { rotation: 0, flipH: false, flipV: false })
+    renderToCanvas(ctx, source, { transforms: { rotation: 0, flipH: false, flipV: false } })
     expect(canvas.width).toBe(800)
     expect(canvas.height).toBe(600)
   })
@@ -63,7 +63,7 @@ describe('renderToCanvas', () => {
   test('with rotation=90, canvas width=source.height, canvas height=source.width', () => {
     const { ctx, canvas } = createMockContext()
     const source = createMockSource(800, 600)
-    renderToCanvas(ctx, source, { rotation: 90, flipH: false, flipV: false })
+    renderToCanvas(ctx, source, { transforms: { rotation: 90, flipH: false, flipV: false } })
     expect(canvas.width).toBe(600)
     expect(canvas.height).toBe(800)
   })
@@ -71,7 +71,7 @@ describe('renderToCanvas', () => {
   test('with rotation=270, canvas dimensions are swapped', () => {
     const { ctx, canvas } = createMockContext()
     const source = createMockSource(800, 600)
-    renderToCanvas(ctx, source, { rotation: 270, flipH: false, flipV: false })
+    renderToCanvas(ctx, source, { transforms: { rotation: 270, flipH: false, flipV: false } })
     expect(canvas.width).toBe(600)
     expect(canvas.height).toBe(800)
   })
@@ -79,7 +79,7 @@ describe('renderToCanvas', () => {
   test('with rotation=180, canvas dimensions match source', () => {
     const { ctx, canvas } = createMockContext()
     const source = createMockSource(800, 600)
-    renderToCanvas(ctx, source, { rotation: 180, flipH: false, flipV: false })
+    renderToCanvas(ctx, source, { transforms: { rotation: 180, flipH: false, flipV: false } })
     expect(canvas.width).toBe(800)
     expect(canvas.height).toBe(600)
   })
@@ -87,7 +87,7 @@ describe('renderToCanvas', () => {
   test('applies correct canvas transform calls', () => {
     const { ctx } = createMockContext()
     const source = createMockSource(800, 600)
-    renderToCanvas(ctx, source, { rotation: 90, flipH: true, flipV: false })
+    renderToCanvas(ctx, source, { transforms: { rotation: 90, flipH: true, flipV: false } })
 
     expect(ctx.save).toHaveBeenCalled()
     expect(ctx.translate).toHaveBeenCalled()
@@ -100,7 +100,7 @@ describe('renderToCanvas', () => {
   test('with flipV=true, calls scale(1, -1)', () => {
     const { ctx } = createMockContext()
     const source = createMockSource(800, 600)
-    renderToCanvas(ctx, source, { rotation: 0, flipH: false, flipV: true })
+    renderToCanvas(ctx, source, { transforms: { rotation: 0, flipH: false, flipV: true } })
     expect(ctx.scale).toHaveBeenCalledWith(1, -1)
   })
 })

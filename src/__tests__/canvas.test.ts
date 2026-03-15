@@ -98,7 +98,7 @@ describe('renderToCanvas replacement color', () => {
       configurable: true,
     });
 
-    renderToCanvas(trackedCtx, source, transforms, defaultAdjustments, undefined, mockMask, '#ff0000');
+    renderToCanvas(trackedCtx, source, { transforms, adjustments: defaultAdjustments, backgroundMask: mockMask, replacementColor: '#ff0000' });
 
     // destination-over must appear in composite ops (to paint color behind subject)
     expect(compositeOps).toContain('destination-over');
@@ -138,7 +138,7 @@ describe('renderToCanvas replacement color', () => {
       configurable: true,
     });
 
-    renderToCanvas(trackedCtx, source, transforms, defaultAdjustments, undefined, mockMask, null);
+    renderToCanvas(trackedCtx, source, { transforms, adjustments: defaultAdjustments, backgroundMask: mockMask, replacementColor: null });
 
     // destination-over must NOT appear when no replacementColor
     expect(compositeOps).not.toContain('destination-over');

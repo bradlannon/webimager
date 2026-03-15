@@ -20,7 +20,7 @@ export function downloadImage(
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  renderToCanvas(ctx, source, transforms, adjustments, crop, backgroundMask, replacementColor);
+  renderToCanvas(ctx, source, { transforms, adjustments, crop, backgroundMask, replacementColor });
 
   const ext = format === 'image/jpeg' ? '.jpg' : '.png';
   const qualityParam = format === 'image/jpeg' ? quality : undefined;

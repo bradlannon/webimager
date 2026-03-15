@@ -196,7 +196,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    renderToCanvas(ctx, state.sourceImage, state.transforms, state.adjustments, state.cropRegion ?? undefined, state.backgroundRemoved ? state.backgroundMask : undefined, state.backgroundRemoved ? state.replacementColor : undefined);
+    renderToCanvas(ctx, state.sourceImage, { transforms: state.transforms, adjustments: state.adjustments, crop: state.cropRegion ?? undefined, backgroundMask: state.backgroundRemoved ? state.backgroundMask : undefined, replacementColor: state.backgroundRemoved ? state.replacementColor : undefined });
 
     // Create resized bitmap from the rendered result
     const resized = await createImageBitmap(canvas, {
