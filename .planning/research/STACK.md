@@ -1,180 +1,226 @@
-# Technology Stack: Background Removal Addition
+# Stack Research
 
-**Project:** WebImager v2.0 -- AI Background Removal
+**Domain:** Browser-based image editor -- v3.0 editing power features (blur/sharpen, preset filters, text overlay, drawing/annotation)
 **Researched:** 2026-03-14
-**Scope:** New dependencies only (existing stack validated in v1.0)
+**Confidence:** HIGH
 
-## Recommended Stack Addition
+## Executive Summary
 
-### Core ML Library
+All four new feature areas can be built with **zero new dependencies**. The existing Canvas 2D API, `ctx.filter` (CSS filter string syntax), inline SVG filters via `ctx.filter = "url(#id)"`, pixel-level convolution via `getImageData`/`putImageData`, and native canvas drawing primitives (`fillText`, `lineTo`, `arc`, `rect`, `moveTo`) cover every requirement. This aligns with the project's established philosophy of vanilla Canvas API over libraries like Fabric.js/Konva.js.
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| `@huggingface/transformers` | ^3.8.1 | ML inference runtime for browser | The de facto standard for running ML models in-browser. Handles ONNX model loading, WASM/WebGPU execution, and provides a high-level `pipeline()` API. Published under the official HuggingFace org (replaces the deprecated `@xenova/transformers`). WebGPU acceleration when available, WASM fallback for all browsers. No separate `onnxruntime-web` install needed -- it is bundled. MIT licensed. | HIGH |
+The only meaningful technical decision is **how** to implement sharpening (pixel-level convolution kernel vs. SVG `feConvolveMatrix` referenced by `url()`). The recommendation is SVG `feConvolveMatrix` for GPU-accelerated sharpening via `ctx.filter = "url(#sharpen)"`, with a pixel-manipulation fallback if cross-browser testing reveals issues.
 
-### Model
+## Recommended Stack
 
-| Model | Size (quantized) | Purpose | Why | Confidence |
-|-------|-------------------|---------|-----|------------|
-| `briaai/RMBG-1.4` (uint8) | ~45 MB | Background segmentation mask | Best browser-compatible background removal model available. RMBG-2.0 exists and has better accuracy (90% vs 74%) but is NOT supported in-browser -- blocked by an onnxruntime-web bug (microsoft/onnxruntime#21968) and produces "Unsupported model type" errors in transformers.js (huggingface/transformers.js#1107). RMBG-1.4 quantized (uint8) delivers excellent quality at ~45 MB, well within acceptable range for a one-time lazy download. Handles arbitrary subjects (products, animals, objects, people). | HIGH |
+### Core Technologies -- No New Dependencies
 
-### No Additional Libraries Needed
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| Canvas 2D `ctx.filter` (CSS string) | Baseline 2024 | Blur, preset filter effects (sepia, saturate, hue-rotate, contrast, brightness, invert, grayscale) | Already used in `buildFilterString()` for adjustments. GPU-accelerated. Supported in all modern browsers since Sept 2024. Extend the existing function with `blur()` and preset filter compositions. |
+| SVG filter elements (`feConvolveMatrix`) | SVG 1.1, universally supported | Sharpen convolution kernel | `ctx.filter = "url(#filterId)"` references inline `<svg>` filter definitions. GPU-accelerated like CSS filters. Avoids slow `getImageData`/`putImageData` pixel loops for sharpening. Define 3-5 intensity levels as separate SVG filter elements. |
+| Canvas 2D drawing API (`fillText`, `measureText`, `lineTo`, `arc`, `rect`, `quadraticCurveTo`) | Stable, universal | Text overlay, freehand drawing, shape annotation | Native canvas primitives. No library needed for freehand paths, arrows, rectangles, circles, lines. |
+| FontFace API (`document.fonts`) | Baseline 2024 | Font loading for text overlay | Ensures fonts are loaded before `ctx.fillText()` renders them. Avoids blank-text flash. |
+| Zustand (existing, 5.0.x) | Already installed | State for filter settings, text elements, drawing strokes | Extend the store with new slices. No new state library needed. |
+| Lucide React (existing, 0.577.x) | Already installed | Icons for new toolbar controls | Has all needed icons (Type, Pencil, Square, Circle, ArrowRight, Minus, Palette, Sliders). |
 
-The existing stack handles everything else:
+### Supporting Libraries -- None Required
 
-| Concern | Existing Solution | Notes |
-|---------|-------------------|-------|
-| State management | Zustand (v5.0.11, already installed) | Add `backgroundMask`, loading/error states to `EditorStore` |
-| Image compositing | Canvas 2D API (already used) | Apply alpha mask via `globalCompositeOperation = 'destination-in'` |
-| Transparency display | `drawCheckerboard()` (already in `canvas.ts`) | Checkerboard already renders behind transparent areas |
-| Download as PNG | Download util (already implemented) | PNG preserves transparency automatically |
-| UI framework | React 19 + Tailwind v4 (already installed) | One new button/panel component |
-| Build tooling | Vite 6.x (already installed) | Needs minor config additions (see below) |
-| Icons | lucide-react (already installed) | Has suitable icons for background removal UI |
+| Feature Area | Approach | Why No Library |
+|--------------|----------|----------------|
+| Blur filter | `ctx.filter = "blur(Npx)"` appended to existing filter string | Native CSS filter, GPU-accelerated, one line of code |
+| Sharpen filter | SVG `<filter>` with `<feConvolveMatrix>` 3x3 kernel, referenced via `ctx.filter = "url(#sharpen-N)"` | GPU-accelerated via browser SVG filter pipeline. Faster than `getImageData` pixel loops on large images. |
+| Preset filters (8-10 presets) | Compositions of CSS filter functions: `sepia()`, `saturate()`, `brightness()`, `contrast()`, `hue-rotate()`, `grayscale()` | All preset styles achievable by composing CSS filter functions. No pixel manipulation needed. |
+| Text overlay | `ctx.font`, `ctx.fillStyle`, `ctx.fillText()`, `ctx.measureText()` | Canvas has full text rendering. System fonts cover the need. `measureText()` provides bounding boxes for hit-testing and drag handles. |
+| Freehand drawing | `ctx.beginPath()`, `ctx.moveTo()`, `ctx.quadraticCurveTo()`, `ctx.stroke()` | Store point arrays in Zustand. Smooth freehand via quadratic Bezier interpolation between consecutive points. |
+| Shape annotation | `ctx.strokeRect()`, `ctx.arc()`, `ctx.moveTo()`/`ctx.lineTo()` for arrows and lines | Rectangles, circles, lines, and arrows are basic canvas primitives. Arrow heads are two short lines at computed angles from the endpoint. |
 
-## Vite Configuration Changes Required
+### Development Tools -- No Changes
 
-The existing `vite.config.ts` needs two additions for ONNX/WASM compatibility:
+Existing Vite 6.x + Vitest 3.x + TypeScript 5.8 + ESLint setup is sufficient. No new dev dependencies.
+
+## Integration with Existing Render Pipeline
+
+### Blur/Sharpen: Extend `buildFilterString()` and `renderToCanvas()`
+
+The existing `buildFilterString()` in `src/utils/canvas.ts` composes CSS filter functions for brightness/contrast/saturation/greyscale. Blur follows the same pattern -- append `blur(Npx)` to the filter string.
+
+Sharpen requires a separate rendering pass because `feConvolveMatrix` is not a CSS filter function; it must be applied via `ctx.filter = "url(#sharpen-id)"` on a separate `drawImage` call before the CSS filters are applied (sharpen the original pixels, then adjust colors/blur).
+
+**New fields in `Adjustments`:**
 
 ```typescript
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
-  optimizeDeps: {
-    exclude: ['@huggingface/transformers'],
-  },
-  worker: {
-    format: 'es',
-  },
-});
+interface Adjustments {
+  brightness: number;   // existing
+  contrast: number;     // existing
+  saturation: number;   // existing
+  greyscale: boolean;   // existing
+  blur: number;         // NEW: 0-10, maps to blur(Npx)
+  sharpen: number;      // NEW: 0-100, maps to SVG filter intensity
+  preset: string;       // NEW: 'none' | preset ID
+}
 ```
 
-**Why these changes:**
-- `optimizeDeps.exclude`: Vite's dependency pre-bundling attempts to parse WASM imports inside `@huggingface/transformers` and fails. Excluding it lets the browser handle WASM loading natively. This is a well-documented requirement across multiple sources.
-- `worker.format: 'es'`: The background removal worker uses dynamic `import()` to load the transformers library lazily; this requires ES module format in workers.
+**Render order in `renderToCanvas()`:**
+1. Draw source image with transforms (rotation, flip) -- existing
+2. If sharpen > 0: apply SVG convolution filter pass on an offscreen canvas
+3. Apply CSS filter string (brightness + contrast + saturation + greyscale + blur + preset) -- extend existing `buildFilterString()`
+4. Apply background mask if active -- existing
+5. Apply replacement color if active -- existing
 
-## Architecture Integration Points
+### Preset Filter Definitions
 
-### Web Worker (critical -- do not skip)
+Pure data, no library:
 
-Background removal MUST run in a Web Worker. The RMBG-1.4 model inference takes 2-10 seconds depending on image size and device hardware. Running on the main thread would freeze the entire UI.
-
-**Pattern:** Create `src/workers/backgroundRemoval.worker.ts` that:
-1. Receives image data via `postMessage` (as `ImageBitmap` -- transferable, zero-copy)
-2. Loads the model on first call via `pipeline('image-segmentation', 'briaai/RMBG-1.4')` (lazy init)
-3. Caches the pipeline instance for subsequent calls (model stays in memory)
-4. Returns the alpha mask as `ImageData` or `ImageBitmap` via `postMessage`
-5. Reports download progress events back to main thread for progress bar
-
-Vite supports `new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })` natively -- no extra plugins needed.
-
-### Canvas Pipeline Integration
-
-The mask from the model integrates into the existing `renderToCanvas()` in `src/utils/canvas.ts`:
-
-1. Model produces a segmentation mask (grayscale image where white = foreground)
-2. Store the mask as an `ImageBitmap` in Zustand state (new `backgroundMask` field)
-3. In `renderToCanvas()`, after drawing the image with transforms/adjustments, apply the mask:
-   ```typescript
-   if (backgroundMask) {
-     ctx.globalCompositeOperation = 'destination-in';
-     ctx.drawImage(backgroundMask, 0, 0, ctx.canvas.width, ctx.canvas.height);
-     ctx.globalCompositeOperation = 'source-over';
-   }
-   ```
-4. The existing `drawCheckerboard()` function handles transparency display
-5. Mask must be regenerated if user applies transforms/crop AFTER background removal
-
-### Store Additions
-
-Add to `EditorStore` interface (in `src/store/editorStore.ts`):
 ```typescript
-// Background removal state
-backgroundMask: ImageBitmap | null;
-isRemovingBackground: boolean;
-backgroundRemovalProgress: number;       // 0-100 for model download
-backgroundRemovalError: string | null;
+interface FilterPreset {
+  id: string;
+  label: string;
+  filterString: string;  // CSS filter function composition
+}
 
-// Background removal actions
-removeBackground: () => Promise<void>;
-restoreBackground: () => void;
+const PRESETS: FilterPreset[] = [
+  { id: 'none',     label: 'Normal',    filterString: '' },
+  { id: 'sepia',    label: 'Sepia',     filterString: 'sepia(80%) contrast(105%)' },
+  { id: 'vintage',  label: 'Vintage',   filterString: 'sepia(40%) contrast(110%) brightness(90%) saturate(80%)' },
+  { id: 'warm',     label: 'Warm',      filterString: 'saturate(130%) sepia(15%) brightness(105%)' },
+  { id: 'cool',     label: 'Cool',      filterString: 'saturate(90%) hue-rotate(15deg) brightness(105%)' },
+  { id: 'bw',       label: 'B&W',       filterString: 'grayscale(100%) contrast(120%)' },
+  { id: 'fade',     label: 'Fade',      filterString: 'contrast(85%) brightness(110%) saturate(80%)' },
+  { id: 'vivid',    label: 'Vivid',     filterString: 'saturate(160%) contrast(115%)' },
+  { id: 'dramatic', label: 'Dramatic',  filterString: 'contrast(140%) brightness(90%) saturate(120%)' },
+  { id: 'noir',     label: 'Noir',      filterString: 'grayscale(100%) contrast(150%) brightness(85%)' },
+];
 ```
 
-This follows the existing pattern of state + actions in the same store (matches `cropMode`, `cropRegion`, etc.).
+Preset thumbnails: render each preset on a tiny (80x80) offscreen canvas from the current image for a visual preset selector strip. Generate once when image loads or preset panel opens.
 
-## Model Loading Strategy
+### Text Overlay: Overlay Canvas + Edit-Until-Apply
 
-| Concern | Approach |
-|---------|----------|
-| **When to download** | Lazy -- only when user clicks "Remove Background" for the first time |
-| **Model caching** | Browser Cache API via transformers.js built-in caching. Model downloads once from HuggingFace CDN, persists across browser sessions automatically |
-| **Progress feedback** | Transformers.js emits download progress callbacks; wire to `backgroundRemovalProgress` in store for a progress bar |
-| **Execution backend** | WebGPU if available (2-5x faster), automatic WASM fallback (works everywhere). Transformers.js handles detection and selection automatically |
-| **Pipeline caching** | Keep the `pipeline()` instance alive in the worker after first creation. Subsequent removals on new images skip model loading entirely |
+Text elements are editable objects until the user clicks "Apply," matching the existing crop UX pattern. Use an **overlay canvas** positioned exactly over the main canvas during text editing mode. When applied, bake text into the main render by drawing it in `renderToCanvas()`.
+
+**State shape:**
+
+```typescript
+interface TextElement {
+  id: string;
+  text: string;
+  x: number; y: number;   // percentage-based coordinates (like crop)
+  fontFamily: string;      // system font name
+  fontSize: number;        // px relative to source image dimensions
+  color: string;           // hex or rgba
+  bold: boolean;
+  italic: boolean;
+}
+```
+
+**Font strategy:** System fonts only (Arial, Georgia, Courier New, Times New Roman, Verdana, Impact, Comic Sans MS). No font file bundling. System fonts are instantly available via `ctx.font` with zero loading cost. If Google Fonts are desired later, load via FontFace API.
+
+**Hit testing for drag:** Use `ctx.measureText()` which returns `TextMetrics` with `actualBoundingBoxAscent`, `actualBoundingBoxDescent`, and `width`. Build a bounding rect from these for pointer-down hit testing.
+
+### Drawing/Annotation: Overlay Canvas + Edit-Until-Apply
+
+Same overlay canvas pattern as text. Drawing strokes and shapes are rendered on the overlay during editing, baked into the main render on "Apply."
+
+**State shape:**
+
+```typescript
+interface DrawingStroke {
+  id: string;
+  tool: 'freehand' | 'arrow' | 'rectangle' | 'circle' | 'line';
+  points: Array<{ x: number; y: number }>;  // percentage-based
+  color: string;
+  thickness: number;  // px relative to source image dimensions
+}
+```
+
+**Freehand smoothing:** Quadratic Bezier interpolation. For each consecutive pair of recorded points, use the midpoint as the curve end and the actual point as the control point. This produces smooth curves from jagged mouse/touch input with no external library.
+
+**Arrow heads:** Compute from the angle of the final segment. Two short lines at +/- 30 degrees from the endpoint, length proportional to stroke thickness.
+
+**Coordinate system:** All coordinates stored as percentages of image dimensions (matching existing crop coordinates). This ensures annotations survive window resizes, zoom changes, and export at different resolutions.
+
+## SVG Filter Elements for Sharpen
+
+Add a hidden `<svg>` element to the DOM (e.g., in `App.tsx` or a dedicated component):
+
+```html
+<svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+  <defs>
+    <filter id="sharpen-25">
+      <feConvolveMatrix order="3" kernelMatrix="0 -0.25 0 -0.25 2 -0.25 0 -0.25 0" />
+    </filter>
+    <filter id="sharpen-50">
+      <feConvolveMatrix order="3" kernelMatrix="0 -0.5 0 -0.5 3 -0.5 0 -0.5 0" />
+    </filter>
+    <filter id="sharpen-75">
+      <feConvolveMatrix order="3" kernelMatrix="0 -1 0 -1 5 -1 0 -1 0" />
+    </filter>
+    <filter id="sharpen-100">
+      <feConvolveMatrix order="3" kernelMatrix="-1 -1 -1 -1 9 -1 -1 -1 -1" />
+    </filter>
+  </defs>
+</svg>
+```
+
+Reference in render pipeline: `ctx.filter = "url(#sharpen-50)"` applied as a separate draw pass on an offscreen canvas, before the CSS filter string for adjustments + preset is applied on the main canvas.
+
+**Fallback:** If SVG filter `url()` proves unreliable in Safari or Firefox, fall back to `getImageData`/`putImageData` convolution with the standard 3x3 sharpen kernel. Performance is acceptable for single still images.
 
 ## Alternatives Considered
 
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| ML runtime | `@huggingface/transformers` | `@imgly/background-removal` (v1.7.0) | AGPL license (viral, incompatible with many projects). Community reports of slower performance. Wraps the same underlying ONNX models with less control over the pipeline. Larger bundle due to bundled model variants. |
-| ML runtime | `@huggingface/transformers` | Raw `onnxruntime-web` | Too low-level. Would need to manually handle model downloading, caching, image preprocessing, postprocessing, and tensor management. Transformers.js wraps all of this with a clean `pipeline()` API. |
-| Model | RMBG-1.4 (quantized) | RMBG-2.0 | Better quality but blocked from in-browser execution. ONNX files are 366 MB+ (quantized) vs 45 MB. Not viable for browser use as of March 2026. |
-| Model | RMBG-1.4 | ModNet | ModNet only handles human/portrait segmentation well. RMBG-1.4 handles arbitrary subjects, which is essential for a general-purpose image editor. |
-| Execution | Web Worker | Main thread | Model inference takes 2-10s. Main thread execution would freeze the entire UI. |
-| Execution | Web Worker | SharedArrayBuffer | Requires COOP/COEP headers (`Cross-Origin-Opener-Policy` / `Cross-Origin-Embedder-Policy`), which complicates static site deployment on GitHub Pages and some CDNs. Standard Web Worker with transferable `ImageBitmap` is simpler and sufficient. |
-| Worker comms | Raw `postMessage` | Comlink | The worker interface is trivially simple (send image, receive mask). Comlink's RPC abstraction adds a dependency for no benefit here. |
+| Recommended | Alternative | When to Use Alternative |
+|-------------|-------------|-------------------------|
+| Vanilla Canvas 2D drawing | Fabric.js (~300KB) / Konva.js (~150KB) | Only if you need a persistent object model with selection handles, grouping, layering, and serialization. WebImager uses edit-until-apply (not persistent objects), so these libraries would fight the existing render pipeline and add massive bundle size for unused features. |
+| CSS filter string composition for presets | Pixel-level manipulation (`getImageData` loops) | Only if you need effects impossible with CSS filters (channel swapping, custom tone curves, split-toning). All 10 recommended presets are achievable with CSS filter composition. |
+| SVG `feConvolveMatrix` for sharpen | `getImageData` pixel convolution | Only if SVG filter `url()` reference is unreliable in target browsers. Pixel approach is slower but universally works. Test SVG approach first. |
+| System fonts for text overlay | Bundled font files / Google Fonts | Only if offline mode or specific brand fonts are required. System fonts are instant, zero-cost, and cover the common use cases. |
+| Overlay canvas for edit-until-apply | Single canvas with full state replay on each pointer move | Overlay is simpler and faster: no need to replay the entire render pipeline (transforms + crop + mask + filters) on every mouse move during drawing. Draw only the annotation layer on the overlay. Bake on apply. |
+| Percentage-based coordinates for annotations | Pixel coordinates | Percentage-based matches existing crop coordinate system. Annotations survive zoom changes, window resizes, and export at different resolutions without coordinate recalculation. |
 
-## What NOT to Add
+## What NOT to Use
 
-| Library | Why Not |
-|---------|---------|
-| `onnxruntime-web` (direct) | Already bundled inside `@huggingface/transformers`. Adding separately causes version conflicts. |
-| `@imgly/background-removal` | AGPL license, slower, wraps the same models with less control. |
-| `@xenova/transformers` | Deprecated v2 package name. The same library is now published as `@huggingface/transformers` (v3+). |
-| `comlink` | Worker communication is too simple to justify an abstraction library. |
-| TensorFlow.js | Heavier runtime (~1.5 MB), worse model ecosystem for image segmentation, no advantage over ONNX for this task. |
-| Any background removal API/server | Violates the core "client-side only, no server calls" constraint. |
-| `fabric.js` / `konva.js` | Not needed. The existing Canvas 2D API with `globalCompositeOperation` handles mask compositing directly. |
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| Fabric.js | ~300KB bundle, introduces object/layer model that conflicts with existing vanilla Canvas render pipeline. Would require rewriting `renderToCanvas()` and the entire rendering approach. | Vanilla Canvas 2D API + Zustand state + overlay canvas |
+| Konva.js | ~150KB, same fundamental conflict -- stage/layer abstraction competes with existing pipeline. Also introduces its own event system that conflicts with existing pointer handlers. | Vanilla Canvas 2D API |
+| CamanJS | Abandoned since 2013. Uses slow pixel manipulation for effects that are now GPU-accelerated via `ctx.filter`. | `ctx.filter` CSS string composition |
+| WebGL / OffscreenCanvas for filters | Massive complexity increase for minimal gain. CSS filters applied via `ctx.filter` are already GPU-accelerated by the browser. Only justified for real-time video processing. | `ctx.filter` with CSS/SVG filter functions |
+| opentype.js / fontkit | Only needed for advanced typography (kerning tables, glyph outlines, custom font parsing). `ctx.fillText()` handles text overlay rendering perfectly. | Native `ctx.font` + `ctx.fillText()` |
+| `CanvasFilter` constructor (`new CanvasFilter()`) | The object-based CanvasFilter API is NOT in Safari as of March 2026. The CSS string syntax for `ctx.filter` has broader support (Baseline 2024). | `ctx.filter = "blur(5px) sepia(80%)"` string syntax |
+| perfect-freehand / other smoothing libraries | Adds dependency for what is a ~15 line quadratic Bezier midpoint interpolation algorithm. The smoothing technique is trivial to implement. | Manual quadratic Bezier interpolation between recorded points |
+
+## Version Compatibility
+
+| Existing Package | Compatible With New Features | Notes |
+|------------------|------------------------------|-------|
+| React 19.x | Overlay canvas refs, new tool panels | Same ref pattern as existing main canvas. No React version concerns. |
+| Zustand 5.x | New state fields and actions | Add `blur`, `sharpen`, `preset`, `textElements`, `drawingStrokes`, `textMode`, `drawingMode` to store. Straightforward extension. |
+| Vite 6.x | No config changes needed | No new loaders, plugins, or build configuration required for v3.0 features. |
+| TypeScript 5.8 | New type definitions | Add `TextElement`, `DrawingStroke`, `FilterPreset` interfaces to `types/editor.ts`. |
+| Tailwind CSS v4 | New UI panels | Utility classes cover filter preset grid, text controls, drawing toolbar. No Tailwind plugin additions needed. |
+| Vitest 3.x | Testing new utils | Filter composition, coordinate math, and smoothing algorithms are pure functions -- easy to unit test with existing setup. |
 
 ## Installation
 
 ```bash
-# Single new dependency
-npm install @huggingface/transformers
+# No new packages required.
+# All v3.0 features are implemented with existing dependencies + native browser APIs.
 ```
 
-One dependency. That is it.
-
-## Hosting / Deployment Impact
-
-The RMBG-1.4 model files (~45 MB quantized) are fetched from HuggingFace's CDN by default. This means:
-- **Zero impact on bundle size** -- model is not bundled, it is fetched at runtime on first use
-- **Zero deployment config changes** -- works on GitHub Pages, Netlify, Vercel as-is
-- **Automatic caching** -- browser caches model files across sessions via Cache API
-- **Self-hosting option** -- if offline support is desired later, copy model files to `/public/models/` and set `env.localModelPath`
-
-## Browser Compatibility
-
-| Browser | WASM (baseline) | WebGPU (accelerated) |
-|---------|-----------------|---------------------|
-| Chrome 113+ | Yes | Yes |
-| Edge 113+ | Yes | Yes |
-| Firefox 120+ | Yes | Behind flag |
-| Safari 16.4+ | Yes | No (as of March 2026) |
-
-All target browsers in the project constraints support WASM. WebGPU provides 2-5x speedup where available but is not required for functionality.
+Zero new dependencies. This is the correct answer.
 
 ## Sources
 
-- [Transformers.js v3 announcement](https://huggingface.co/blog/transformersjs-v3) -- WebGPU support, `@huggingface/transformers` package name
-- [Transformers.js v4 preview](https://huggingface.co/blog/transformersjs-v4) -- Upcoming version, not yet stable (use v3)
-- [@huggingface/transformers on npm](https://www.npmjs.com/package/@huggingface/transformers) -- v3.8.1, latest stable
-- [RMBG-1.4 on HuggingFace](https://huggingface.co/briaai/RMBG-1.4) -- Model card, ONNX weights, quantization details
-- [RMBG-2.0 browser blocker](https://huggingface.co/briaai/RMBG-2.0/discussions/12) -- transformers.js support discussion
-- [RMBG-2.0 onnxruntime-web bug](https://github.com/microsoft/onnxruntime/issues/21968) -- Browser execution blocked
-- [RMBG-2.0 unsupported model type](https://github.com/huggingface/transformers.js/issues/1107) -- transformers.js integration error
-- [Addy Osmani's bg-remove](https://github.com/addyosmani/bg-remove) -- Reference React + transformers.js implementation
-- [Wes Bos bg-remover](https://github.com/wesbos/bg-remover) -- Another reference implementation
-- [Optimizing Transformers.js for Production](https://www.sitepoint.com/optimizing-transformers-js-production/) -- Vite config patterns, `optimizeDeps.exclude`
-- [Transformers.js dtypes guide](https://huggingface.co/docs/transformers.js/en/guides/dtypes) -- Quantization options (uint8, fp16, etc.)
-- [@imgly/background-removal on npm](https://www.npmjs.com/package/@imgly/background-removal) -- v1.7.0, AGPL license
-- [BRIA RMBG-2.0 benchmarks](https://blog.bria.ai/benchmarking-blog/brias-new-state-of-the-art-remove-background-2.0-outperforms-the-competition) -- 90% vs 74% accuracy comparison
+- [MDN: CanvasRenderingContext2D.filter](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/filter) -- Supported CSS filter functions (blur, sepia, saturate, hue-rotate, contrast, brightness, grayscale, invert, opacity), browser compatibility Baseline 2024. HIGH confidence.
+- [MDN: fillText()](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/fillText) -- Canvas text rendering. HIGH confidence.
+- [MDN: TextMetrics](https://developer.mozilla.org/en-US/docs/Web/API/TextMetrics) -- Text measurement for bounding boxes and hit-testing. HIGH confidence.
+- [MDN: feConvolveMatrix](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Element/feConvolveMatrix) -- SVG convolution filter for sharpening kernels. HIGH confidence.
+- [web.dev: Image filters with canvas](https://web.dev/canvas-imagefilters/) -- Convolution kernel fundamentals and `getImageData`/`putImageData` approach. MEDIUM confidence (older article, technique is stable).
+- [Chrome blog: Canvas2D updates](https://developer.chrome.com/blog/canvas2d) -- CanvasFilter constructor API and new Canvas 2D features. HIGH confidence.
+- [GitHub Gist: Sharpen function (mikecao)](https://gist.github.com/mikecao/65d9fc92dc7197cb8a7c) -- Reference pixel-level sharpen convolution implementation. LOW confidence (community source, math is standard).
+- [Viget: Instagram-style filters in HTML5 Canvas](https://www.viget.com/articles/instagram-style-filters-in-html5-canvas) -- Approach for preset filter composition. MEDIUM confidence.
+- [IMG.LY: How to apply filters in JavaScript](https://img.ly/blog/how-to-apply-filters-in-javascript/) -- Convolution and CSS filter techniques. MEDIUM confidence.
+
+---
+*Stack research for: WebImager v3.0 editing power features*
+*Researched: 2026-03-14*

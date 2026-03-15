@@ -1,182 +1,264 @@
 # Feature Research
 
-**Domain:** In-browser AI background removal for a client-side image editor
+**Domain:** Browser-based image editor -- blur/sharpen filters, preset image filters, text overlay, drawing/annotation tools
 **Researched:** 2026-03-14
 **Confidence:** HIGH
 
 ## Context
 
-This is a subsequent milestone for WebImager v2.0. The existing v1.0 editor already ships upload, resize, crop, rotate/flip, brightness/contrast/saturation/greyscale, and JPEG/PNG download. All processing is client-side. This research focuses specifically on the background removal feature being added.
+This is a subsequent milestone (v3.0) for WebImager. The existing editor already ships: upload, crop, resize, rotate/flip, brightness/contrast/saturation/greyscale adjustments, AI background removal with color replacement, zoom/pan, transparency-aware export, and a glassmorphism bottom bar UI with 6 tabs. All processing is client-side via Canvas 2D API with a non-destructive render pipeline (`renderToCanvas()` rebuilds from `sourceImage` + parameters on every change).
 
-The v1.0 FEATURES.md (researched 2026-03-13) covered the general editor feature landscape. This document supersedes it for the v2.0 milestone scope.
-
-## Competitive Landscape Context
-
-Background removal is dominated by server-side tools (remove.bg, Photoroom, Canva) that require accounts and have free-tier limits. WebImager's angle is unique: **fully client-side, no upload, no account, unlimited use, integrated into an editor**. This is not competing on removal quality (server-side models with large GPUs will always win on edge cases). It is competing on privacy, simplicity, and the integrated editing workflow.
+This research focuses on the four new feature areas: blur/sharpen filters, preset filters, text overlay, and drawing/annotation.
 
 ## Feature Landscape
 
 ### Table Stakes (Users Expect These)
 
-Features users assume exist when they click "Remove Background." Missing any of these and the feature feels broken.
+Features users assume exist in any image editor that advertises filters, text, and drawing. Missing any of these makes the feature feel half-baked.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| One-click background removal | Every competitor does this in a single click. Users expect zero configuration before seeing a result. | MEDIUM | Core ML inference pipeline. `@imgly/background-removal` wraps ONNX Runtime Web with ISNET model. Returns a PNG blob with alpha channel. Main implementation work is integrating the model, running inference in a Web Worker, and wiring the mask into the render pipeline. |
-| Transparent background preview | Users need to see what they got. A checkerboard pattern behind the subject is the universal transparency indicator (Photoshop, Figma, every design tool uses this). | LOW | Draw a checkerboard pattern on the canvas beneath the masked image. Toggle between original view and removed-background view. |
-| Loading/progress feedback | The ML model is ~10MB on first download and inference takes 1-5 seconds. Without feedback, users assume the app crashed. | LOW | `@imgly/background-removal` supports progress callbacks for model download and inference stages. Show a progress bar or percentage during download, spinner during inference. |
-| PNG export with transparency | The primary use case: get a subject on a transparent background for compositing elsewhere. | LOW | WebImager already exports PNG via `canvas.toBlob('image/png')`. The work is ensuring the alpha channel from the mask survives through `renderToCanvas()`. Currently the pipeline uses `ImageBitmap` which supports alpha. Verify the render pipeline does not flatten alpha (e.g., by drawing onto a white-filled canvas). |
-| JPEG export handles missing background | JPEG has no alpha channel. If user exports as JPEG after removal, the transparent area must become white (not black, not garbage pixels). | LOW | When format is `image/jpeg`, fill the canvas with white before compositing the masked image. Simple but easy to forget -- results in a black background if missed. |
-| Revert to original | Users expect to undo the removal if results are bad or they change their mind. | LOW | WebImager's non-destructive pipeline already preserves the source `ImageBitmap`. Add a `backgroundRemoved` flag to `EditorState`. The mask is applied at render time, not baked into the source. A "Restore Background" button toggles the flag. |
-| Works on common subjects | People, products, animals, objects on reasonably distinct backgrounds. Users expect these to work without manual intervention. | N/A (model quality) | ISNET/U2NET models handle these well. Hair detail on complex backgrounds is where quality drops. This is acceptable -- all free tools have this limitation. |
+| Gaussian blur with intensity slider | Every image editor has blur; the most basic filter operation | LOW | `ctx.filter = "blur(Npx)"` -- GPU-accelerated via the same CSS filter pipeline already used for brightness/contrast. Slots directly into existing `buildFilterString()`. Add a `blur: number` field to `Adjustments` (default 0, range 0-20px). |
+| Sharpen with intensity slider | Users expect sharpen as the counterpart to blur | MEDIUM | No native `ctx.filter` sharpen exists. Requires convolution kernel via `getImageData`/`putImageData` pixel manipulation. Standard 3x3 kernel: `[0,-1,0, -1,5,-1, 0,-1,0]`. Intensity controlled by interpolating between identity kernel `[0,0,0, 0,1,0, 0,0,0]` and sharpen kernel. This is a new code path -- the existing pipeline uses only CSS filters. |
+| 8-10 preset filters (sepia, vintage, warm, cool, B&W, etc.) | Instagram/phone cameras trained users to expect one-click filter presets | LOW | Achievable entirely via CSS filter string combinations (see Preset Filter Recipes below). No pixel manipulation needed. UI: grid of named buttons in a panel. Clicking one sets the filter, clicking again or "None" removes it. |
+| Text overlay with font size and color | Minimum viable text tool; users need to put captions/labels on images | MEDIUM | Render via `ctx.fillText()` on an overlay canvas. Store as state object `{text, x, y, fontSize, color, fontFamily}` until applied. The overlay canvas is the key architectural addition. |
+| Text drag-to-position | Users expect to place text by dragging, not entering coordinates | MEDIUM | Hit-testing on text bounding box via `ctx.measureText()`. Pointer events for drag. Must convert screen coordinates to image coordinates using inverse of zoom/pan transform: `imageX = (screenX - panOffset.x) / zoomLevel`. |
+| Freehand pen drawing | Core annotation tool; users expect to scribble/mark up images | MEDIUM | Capture `pointermove` events, store as array of `{x,y}` points in image space. Render via `ctx.beginPath(); ctx.moveTo(); ctx.lineTo()` sequence. Use `ctx.lineJoin = "round"; ctx.lineCap = "round"` for smooth strokes. |
+| Drawing color picker | Users need to choose annotation color | LOW | Preset color swatches (red, blue, green, yellow, white, black) plus optional `<input type="color">` for custom. Shared between text and drawing tools. |
+| Drawing thickness control | Thin lines for detail, thick for emphasis | LOW | 3-4 preset sizes (2px, 4px, 8px, 16px) or a slider. Maps to `ctx.lineWidth`. |
+| Rectangle shape annotation | Most basic shape for highlighting regions | LOW | Two-point interaction: pointerdown for corner 1, drag to corner 2. Render via `ctx.strokeRect()`. |
+| Arrow annotation | The most-used annotation shape -- "look here" | MEDIUM | Line with arrowhead. Arrowhead requires trigonometry: compute angle from line direction, draw triangle at endpoint. ~20 lines of math, not complex but needs care. |
+| Edit-until-applied pattern for text and drawing | PROJECT.md explicitly requires this; matches existing crop UX | MEDIUM | All overlays render on a separate canvas layer above the image canvas. "Apply" flattens them onto the image. Until applied, elements are movable/editable/deletable. This is the same modal pattern as crop mode. |
+| Live preview for blur intensity | Users expect to see blur change as they drag the slider | LOW | Blur via `ctx.filter` is GPU-accelerated and renders instantly at any image size. Same live-preview behavior as existing brightness/contrast sliders. |
+| Live preview for sharpen intensity | Users expect the same responsiveness as blur | MEDIUM | Sharpen via pixel manipulation is CPU-bound. For images > 2 megapixels, full-resolution sharpen on every slider tick will cause jank. Needs throttle/debounce: either render preview at reduced resolution during drag, or apply sharpen only on pointer release. |
 
 ### Differentiators (Competitive Advantage)
 
-Features that set WebImager apart. Not required for a working removal feature, but increase value.
+Not expected in a lightweight browser editor, but would impress users and set WebImager apart.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Solid color background replacement | Most free tools give transparent PNG only. Letting users pick white, black, or a custom color is a quick win. Product photographers for Amazon/eBay specifically need white backgrounds. | LOW | After generating the mask, composite the subject over a filled rectangle. A color picker with preset swatches (white, black, grey, custom). Minimal UI addition. |
-| Combined with existing adjustments | WebImager already has brightness/contrast/saturation. Applying these to the subject after removal (e.g., brighten a dark product photo) is something standalone removal tools cannot do. This is the natural advantage of being an editor. | LOW | Already works if the render pipeline applies adjustments after masking. Verify render order: source -> crop -> mask -> adjustments -> export. No extra UI needed. |
-| Edge softness / feathering slider | A single slider controlling mask edge softness prevents the harsh "cut out with scissors" look. Clipping Magic charges for this. Most free tools offer no edge control. | MEDIUM | Apply a Gaussian blur to the alpha mask before compositing. Map a 0-100% slider to a blur radius (0-5px). This is post-processing on the mask, not model re-inference. |
-| Before/after comparison toggle | Quick flip between original and removed-background view. Useful for quality assessment and surprisingly satisfying to use. | LOW | A toggle button that swaps between rendering with and without the mask. Can reuse this pattern for future adjustment comparisons. |
-| Privacy as a feature | "Your images never leave your device -- not even for AI processing." No competitor can say this because they all use server-side models. | LOW | Already have a privacy badge in v1. Update messaging to explicitly mention AI processing stays local. Zero implementation cost, high trust value. |
-| Offline capability after first use | After the model downloads once, background removal works without internet. No competitor offers this. | MEDIUM | `@imgly/background-removal` can cache the model. Verify IndexedDB caching works across browsers. May need to configure `publicPath` and caching strategy. |
+| Filter strength slider on presets | Most preset filters are binary on/off. A 0-100% strength slider lets users dial in the exact amount. Implementation: scale CSS filter parameter values proportionally (e.g., sepia at 50% strength = `sepia(40%)` instead of `sepia(80%)`). | MEDIUM | Strong differentiator -- most lightweight editors lack this. For CSS-filter-based presets, multiply each parameter by the strength percentage. |
+| Smooth freehand with curve interpolation | Raw pointermove data produces jagged paths with too many points. Using quadratic Bezier curves between midpoints of consecutive segments produces smooth, professional-looking strokes. | LOW | ~20 lines of code. Use `ctx.quadraticCurveTo()` with midpoints as control points. Significant visual improvement over raw line segments. |
+| Preset filter preview thumbnails | Show a small preview of each filter applied to the current image, like Instagram's filter picker | MEDIUM | Generate by rendering source at ~60x60px with each filter applied. Cache until image changes. Requires 8-10 mini canvas renders on image load (fast at thumbnail size). Major UX improvement. |
+| Circle/ellipse shape | Adds versatility for highlighting round areas (faces, buttons) | LOW | `ctx.ellipse()` or `ctx.arc()`. Same two-point bounding-box interaction as rectangle. |
+| Line shape | Simple straight line annotation | LOW | Two points, `ctx.moveTo(); ctx.lineTo()`. Trivial alongside arrow. |
+| Text font family selector | Let users choose from 4-5 web-safe fonts | LOW | Sans-serif, serif, monospace, handwriting (cursive), display. `ctx.font` accepts CSS font strings. Keep selection small to avoid choice paralysis. |
+| Undo last drawing stroke | Delete the most recent pen stroke or shape | LOW | Maintain an array of drawing operations. Pop the last one. Re-render remaining. Critical for usability -- without this, any mistake means clearing everything. |
+| Clear all annotations button | Reset all text and drawings at once | LOW | Clear overlay canvas and empty operations array. |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
-Features that seem good but create problems in WebImager's context.
-
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| Manual mask painting / brush tool | Users want to fix areas the AI missed by painting on the mask. | Requires a full brush engine (size, hardness, opacity), an undo stack for brush strokes, and effectively a layer system. Massive complexity jump that violates WebImager's "keep it simple" philosophy. Turns a one-click tool into Photoshop. | Accept that edge cases will not be perfect. The edge softness slider handles most "harsh edge" complaints. Users needing pixel-perfect masks should use Photopea or Photoshop. |
-| Batch background removal | Process multiple images at once. | Violates the single-image workflow constraint in PROJECT.md. Each image takes 1-5 seconds of inference. Memory usage scales linearly. UI for managing a queue of results is a whole sub-product. | Stay single-image. Users needing batch should use remove.bg's API or similar. |
-| Background replacement with uploaded image | Upload a second image as the new background (e.g., put yourself on a beach). | Introduces a second image pipeline, positioning/scaling/tiling controls, and layer compositing. Scope explosion. The UI for positioning a background image behind a subject is essentially building a layer system. | Offer solid color replacement. Users can download the transparent PNG and composite in Canva/Figma/anything. |
-| Server-side fallback for better quality | Some models run better on GPU servers. Offer cloud option for hard cases. | Violates the core constraint: "All processing happens client-side." Introduces server costs, privacy concerns, API keys, authentication, and the need for a backend. Exactly what WebImager avoids. | Use the best client-side model available. ISNET via `@imgly/background-removal` is state-of-the-art for browser inference. Quality will improve as models and WebGPU support mature. |
-| Multiple subject selection / instance segmentation | Let users choose which detected subjects to keep (e.g., keep person A but not person B). | Requires instance segmentation (per-object detection), not just foreground/background separation. Different model architecture, much more complex UI with selectable regions. | The model keeps all foreground subjects. Users can crop to isolate specific subjects (crop already exists in v1). |
-| Real-time video background removal | Apply removal to webcam or video. | Entirely different technical domain. Still-image models run at 1-5 seconds per frame, far too slow for 30fps video. Architecture is completely different (streaming inference, temporal consistency). | Out of scope. This is an image editor. |
-| Background blur (portrait mode effect) | Keep the background but blur it, like phone portrait mode. | Different from removal -- requires depth estimation or segmentation with a blur pass. The mask from background removal could theoretically be reused, but applying variable blur based on a binary mask looks cheap. Real portrait blur needs depth maps. | Defer to v3+ if there is demand. Would need a separate "portrait blur" feature, not a mode of background removal. |
+| Full layer system with per-layer opacity/blending | "Real" editors have layers | Fundamentally changes architecture from parameter-based pipeline to scene graph. Massive scope. PROJECT.md explicitly excludes this. | Edit-until-applied pattern: overlays are editable until flattened. 90% of the UX at 10% of the complexity. |
+| Full undo/redo for all operations | Users want to undo everything | Requires either command pattern (inverse operations) or state snapshots (full ImageBitmap per step -- memory intensive). Listed as future candidate, not v3.0. | Per-tool undo: undo last stroke, undo text placement. Blur/sharpen/filters are non-destructive sliders (just move them back). Crop already has undo. |
+| Rich text formatting (bold/italic/mixed sizes) | "Real" text tools have formatting | Canvas `fillText` does not support inline formatting. Each styled segment requires separate measuring and positioning. Complex layout logic for minimal gain. | Single-style text blocks: one font, one size, one color per element. Add multiple text elements for different styles. |
+| Custom filter creation (adjust matrix values) | Power users want custom filters | Exposes convolution kernels and color matrices -- confuses 99% of users. Complex UI for minimal value. | 8-10 well-curated presets cover virtually all use cases. |
+| Bezier pen tool (vector paths) | Design tools like Figma have this | Vector path editing is an entirely different interaction paradigm. Massive implementation effort. Not expected in a photo editor. | Freehand pen with smooth curves plus basic shapes. |
+| Selective area blur (blur brush) | Blur just a face or region | Requires mask painting + per-pixel conditional blur. Introduces layer/mask complexity that PROJECT.md explicitly excludes. | Full-image blur with adjustable intensity. Users needing selective blur can crop-blur-recomposite externally. |
+| Pressure-sensitive drawing | Drawing tablets support pressure for variable line width | Requires Pointer Events pressure API, variable-width stroke rendering (not a single `lineWidth`), and complex path rendering. Small user base. | Uniform-width strokes. Clean and predictable. |
+| Text effects (shadow, outline, gradient) | Design tools offer these | Each effect adds UI controls and rendering complexity. `ctx.strokeText()` for outline is doable but shadow/gradient require multi-pass rendering. Scope creep. | Clean solid-color text. Users needing effects should use Canva/Figma. |
 
 ## Feature Dependencies
 
 ```
-[ML Model Loading + Caching]
-    └──requires──> [One-click removal] (core inference)
-                       └──enables──> [Transparent PNG export]
-                       └──enables──> [Solid color replacement]
-                       └──enables──> [Edge softness slider]
-                       └──enables──> [Before/after toggle]
-                       └──enables──> [JPEG white-fill compositing]
+[Blur slider]
+    (no dependencies -- extends existing buildFilterString())
 
-[Existing render pipeline]
-    └──requires modification──> [Alpha channel preservation]
-        └──enables──> [Transparent PNG export]
+[Sharpen slider]
+    (no dependencies on other v3 features -- but requires new getImageData pixel manipulation path)
 
-[Existing adjustments (brightness/contrast/saturation)]
-    └──enhances──> [Background removal]
-        (adjustments apply to the masked result -- verify pipeline order)
+[Preset filters]
+    └──benefits from──> [Blur] (some presets could include blur)
+    └──benefits from──> [Sharpen] (some presets could include sharpen)
+    └──independent of──> [Text and Drawing]
 
-[Existing crop tool]
-    └──enhances──> [Background removal]
-        (crop after removal to tighten framing around subject)
+[Overlay canvas layer] (KEY ARCHITECTURAL ADDITION)
+    └──enables──> [Text overlay]
+    └──enables──> [Freehand drawing]
+    └──enables──> [Shape annotation]
+    └──enables──> [Edit-until-applied pattern]
+    └──requires──> [Screen-to-image coordinate transform]
 
-[Existing PNG download]
-    └──enables──> [Transparent PNG export]
-        (format already supported; ensure alpha survives toBlob)
+[Text overlay]
+    └──requires──> [Overlay canvas layer]
+    └──requires──> [Screen-to-image coordinate transform]
+    └──shares UI──> [Color picker] with [Drawing tools]
+
+[Freehand drawing]
+    └──requires──> [Overlay canvas layer]
+    └──requires──> [Drawing state management] (operations array)
+
+[Shape annotation (arrow, rect, circle, line)]
+    └──requires──> [Overlay canvas layer]
+    └──shares──> [Drawing state management] with [Freehand drawing]
+    └──shares UI──> [Color picker, thickness control] with [Freehand drawing]
+
+[Apply/flatten action]
+    └──requires──> [Overlay canvas layer]
+    └──composites overlay onto image canvas, creates new sourceImage
 ```
 
 ### Dependency Notes
 
-- **One-click removal requires ML model loading:** The ONNX model must download (~10MB first time) and initialize before any inference. This is the critical path. Everything else depends on having a working foreground mask.
-- **Transparent PNG export requires alpha channel preservation:** WebImager's `renderToCanvas()` must not flatten alpha. Currently it calls `ctx.drawImage()` which preserves alpha, but verify there is no `ctx.fillRect(white)` call clearing the canvas before drawing. JPEG export must explicitly fill white first.
-- **Solid color replacement requires the mask:** Cannot replace the background without first having the foreground/background separation.
-- **Edge softness requires the mask:** The feathering slider post-processes the alpha mask with a blur before compositing. Does not re-run inference.
-- **Existing adjustments enhance removal for free:** If the render pipeline applies adjustments (brightness, contrast, etc.) after the mask, users can adjust the isolated subject. Verify the pipeline order does not apply adjustments before masking (which would adjust the background too, then remove it -- correct but wasteful).
-- **Existing crop enhances removal for free:** Users can crop tightly around the subject after removal. Already works if crop applies in the pipeline regardless of mask state.
+- **Overlay canvas layer is the single most important architectural addition.** A second `<canvas>` positioned over the image canvas, sharing identical zoom/pan CSS transforms, holding all editable annotations. This enables text, drawing, and shapes simultaneously. When "Apply" is called, the overlay composites onto the image at image-space resolution (not screen resolution) and becomes the new `sourceImage`.
+- **Screen-to-image coordinate transform is critical.** With zoom/pan active, screen coordinates from pointer events must map to image-space coordinates: `imageX = (screenX - canvasRect.left - panOffset.x) / zoomLevel`. The existing `zoomLevel` and `panOffset` in the store provide the data; the inverse transform is straightforward but must be pixel-accurate.
+- **Blur/sharpen and preset filters are completely independent of text/drawing.** They extend the existing non-destructive Adjustments pipeline. Can be built in total isolation as a first phase.
+- **Text and drawing share the overlay canvas, color picker, and apply mechanism.** Building them in the same phase avoids duplicating the overlay infrastructure. However, text and drawing are independent of each other and could theoretically be split.
 
-## MVP Definition
+## Implementation Phases
 
-### Launch With (v2.0)
+### Phase 1: Filters (blur, sharpen, presets)
 
-Minimum viable background removal -- what ships as the v2.0 feature.
+Extends existing infrastructure with minimal architectural change.
 
-- [ ] One-click "Remove Background" button in the sidebar -- single entry point, no configuration needed
-- [ ] ML inference via `@imgly/background-removal` running in a Web Worker to keep UI responsive
-- [ ] Progress indicator during model download (first use) and inference
-- [ ] Transparent background preview with checkerboard pattern on canvas
-- [ ] Non-destructive mask in the render pipeline (toggle on/off, source image preserved)
-- [ ] "Restore Background" button to revert
-- [ ] PNG download preserves alpha channel (transparent background)
-- [ ] JPEG download composites onto white background (not black)
+- [ ] Blur slider (0-20px) -- add `blur` field to `Adjustments`, extend `buildFilterString()`
+- [ ] Sharpen slider -- new `applySharpen()` utility using convolution kernel on ImageData, called as post-processing step in render pipeline
+- [ ] Sharpen performance strategy: throttle during drag, full-res on release for images > 2MP
+- [ ] 8-10 preset filter grid UI in bottom bar panel
+- [ ] Preset selection applies a named CSS filter string, overriding/combining with manual adjustments
+- [ ] "None" option to clear active preset
 
-### Add After Validation (v2.x)
+### Phase 2: Text overlay
 
-Features to add once core removal is working and stable.
+Introduces the overlay canvas architecture.
 
-- [ ] Solid color background replacement (white, black, custom picker) -- highest-value differentiator, low effort
-- [ ] Edge softness/feathering slider -- improves perceived quality significantly
-- [ ] Before/after comparison toggle -- low effort, good UX polish
-- [ ] Verify and optimize model caching in IndexedDB across browsers
+- [ ] Overlay `<canvas>` element, absolutely positioned over image canvas, matching zoom/pan transforms
+- [ ] Screen-to-image coordinate transform utility
+- [ ] Text input UI: text field, font size slider, color picker, font family selector
+- [ ] Text state object in store: `{text, x, y, fontSize, color, fontFamily}`
+- [ ] Drag-to-position via pointer events on overlay canvas
+- [ ] Tap-to-edit: clicking existing text re-opens input for editing
+- [ ] Apply button: flatten text onto image (composite overlay at image resolution, create new sourceImage)
+- [ ] Cancel/delete option before applying
 
-### Future Consideration (v3+)
+### Phase 3: Drawing and annotation
 
-- [ ] Multiple model options (quality vs speed tradeoff) -- adds UI complexity for marginal gain
-- [ ] Background blur / portrait mode effect -- needs separate research, different technique
-- [ ] WebGPU acceleration for faster inference -- browser support still maturing
+Shares overlay canvas from Phase 2.
+
+- [ ] Tool selector UI: pen, arrow, rectangle, circle, line
+- [ ] Drawing operations array in store: each entry is `{type, points, color, thickness}`
+- [ ] Freehand pen: capture pointermove, store points, render with round line caps/joins
+- [ ] Shape tools: two-point interaction (pointerdown + drag + pointerup) for arrow, rectangle, circle, line
+- [ ] Arrow rendering: line + triangular arrowhead at endpoint using angle math
+- [ ] Undo last stroke (pop from operations array, re-render)
+- [ ] Clear all annotations button
+- [ ] Apply/flatten to commit all drawings to image (same mechanism as text apply)
+
+### Defer to Future
+
+- [ ] Filter strength slider on presets -- nice differentiator, add after core presets work
+- [ ] Preset filter preview thumbnails -- polish feature
+- [ ] Full undo/redo history -- PROJECT.md lists as future candidate
+- [ ] Text effects (shadow, outline) -- scope creep
 
 ## Feature Prioritization Matrix
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| One-click removal | HIGH | MEDIUM | P1 |
-| Progress indicator | HIGH | LOW | P1 |
-| Transparent preview (checkerboard) | HIGH | LOW | P1 |
-| PNG export with alpha | HIGH | LOW | P1 |
-| JPEG white-fill compositing | MEDIUM | LOW | P1 |
-| Revert to original | HIGH | LOW | P1 |
-| Solid color replacement | MEDIUM | LOW | P2 |
-| Edge softness slider | MEDIUM | MEDIUM | P2 |
-| Before/after toggle | LOW | LOW | P2 |
-| Model caching optimization | MEDIUM | MEDIUM | P2 |
-| Background blur effect | LOW | HIGH | P3 |
-| Multiple model options | LOW | HIGH | P3 |
-| WebGPU acceleration | LOW | HIGH | P3 |
+| Blur slider | HIGH | LOW | P1 |
+| Sharpen slider | HIGH | MEDIUM | P1 |
+| Preset filters (8-10) | HIGH | LOW | P1 |
+| Overlay canvas layer | HIGH (enables text+drawing) | MEDIUM | P1 |
+| Text overlay with drag positioning | HIGH | MEDIUM | P1 |
+| Freehand pen drawing | HIGH | MEDIUM | P1 |
+| Arrow annotation | HIGH | MEDIUM | P1 |
+| Rectangle annotation | MEDIUM | LOW | P1 |
+| Circle annotation | MEDIUM | LOW | P1 |
+| Line annotation | MEDIUM | LOW | P1 |
+| Color picker + thickness controls | HIGH | LOW | P1 |
+| Edit-until-applied (text + drawing) | HIGH | MEDIUM | P1 |
+| Undo last drawing stroke | HIGH | LOW | P1 |
+| Clear all annotations | MEDIUM | LOW | P1 |
+| Smooth freehand (Bezier curves) | MEDIUM | LOW | P2 |
+| Text font family selector | MEDIUM | LOW | P2 |
+| Filter strength slider | MEDIUM | MEDIUM | P2 |
+| Preset filter thumbnails | MEDIUM | MEDIUM | P3 |
 
 **Priority key:**
-- P1: Must have for v2.0 launch
-- P2: Should have, add in v2.x
-- P3: Nice to have, future consideration
+- P1: Must have for v3.0 launch
+- P2: Should have, add if time permits during v3.0
+- P3: Nice to have, defer to future
+
+## Preset Filter Recipes
+
+All achievable via CSS filter string combinations through `ctx.filter`, fitting directly into the existing `buildFilterString()` approach. No pixel manipulation needed.
+
+| Preset | CSS Filter String | Character |
+|--------|-------------------|-----------|
+| **Sepia** | `sepia(80%) saturate(120%) brightness(105%)` | Warm brown tones, classic old-photo look |
+| **Vintage** | `sepia(40%) contrast(90%) brightness(105%) saturate(80%)` | Faded, slightly warm, low contrast |
+| **Warm** | `sepia(20%) saturate(130%) brightness(105%) hue-rotate(-10deg)` | Pushed toward orange/gold tones |
+| **Cool** | `sepia(20%) saturate(110%) brightness(100%) hue-rotate(180deg)` | Pushed toward blue tones |
+| **B&W** | `grayscale(100%) contrast(110%)` | High-contrast monochrome |
+| **Fade** | `contrast(80%) brightness(110%) saturate(70%)` | Washed-out, low-saturation, dreamy |
+| **Vivid** | `saturate(180%) contrast(115%) brightness(102%)` | Punchy, oversaturated colors |
+| **Dramatic** | `contrast(140%) brightness(90%) saturate(120%)` | Deep shadows, strong contrast |
+| **Noir** | `grayscale(100%) contrast(150%) brightness(90%)` | Film-noir high-contrast B&W |
+| **Retro** | `sepia(30%) hue-rotate(340deg) saturate(140%) contrast(90%)` | 70s color cast, warm magenta tint |
+
+**Integration approach:** A preset is a named filter string. When a preset is active, its filter string replaces the manual adjustment sliders' output in `buildFilterString()`. The blur slider should compose with presets (blur + sepia = a blurry vintage look). Sharpen applies as a separate post-processing step regardless.
+
+## Technical Integration Notes
+
+### How blur fits the existing pipeline
+Add `blur: number` (default 0) to the `Adjustments` interface. In `buildFilterString()`, append `blur(${adjustments.blur}px)` when non-zero. Composes naturally with existing brightness/contrast/saturation. GPU-accelerated, no performance concern.
+
+### How sharpen fits the existing pipeline
+Sharpen cannot use `ctx.filter`. It must run as a post-processing step:
+1. `renderToCanvas()` produces the image with all CSS filters applied
+2. New `applySharpen(ctx, intensity)` reads pixel data via `getImageData()`
+3. Applies 3x3 convolution kernel with intensity-weighted interpolation
+4. Writes result via `putImageData()`
+
+For performance on large images: use `requestAnimationFrame` throttling during slider drag, or apply to a downscaled preview canvas and only do full-resolution on slider release.
+
+### Overlay canvas architecture
+A second `<canvas>` absolutely positioned over the image canvas in the same container. Both canvases share the same CSS `transform: translate(${panX}px, ${panY}px) scale(${zoom})` so annotations visually align with the image. The overlay canvas dimensions match the image canvas dimensions.
+
+Drawing/text coordinates are stored in image space (0 to imageWidth, 0 to imageHeight), not screen space, so they survive zoom/pan changes.
+
+### Apply/flatten mechanism
+When "Apply" is triggered:
+1. Create an offscreen canvas at full image resolution
+2. Draw the current rendered image onto it
+3. Draw the overlay content at image-space coordinates (not screen-scaled)
+4. Create new `ImageBitmap` from the composited result
+5. Set as new `sourceImage`, reset overlay state
+6. This bakes annotations permanently into the image (matches the crop apply pattern)
+
+### Bottom bar tab organization
+Adding 3 new features (Filters, Text, Draw) to the existing 6 tabs creates 9 tabs total. On mobile (320px width), 9 icon-only tabs at ~35px each = 315px -- tight but workable. Options if it feels cramped:
+- Group "Filters" into the existing "Adjustments" tab as a sub-section (blur/sharpen sliders + preset grid)
+- This reduces new tabs to 2 (Text, Draw), total = 8 tabs
+- Or: use a horizontally scrollable tab bar on mobile
 
 ## Competitor Feature Analysis
 
-| Feature | remove.bg | Photoroom | Canva | WebImager v2 (plan) |
-|---------|-----------|-----------|-------|---------------------|
-| One-click removal | Yes (server) | Yes (server) | Yes (server) | Yes (client-side) |
-| Transparent PNG | Yes | Yes | Pro only | Yes (free) |
-| Color replacement | White only (free) | Many options | Pro only | White, black, custom |
-| Edge refinement | Paid tier | Basic | No | Feathering slider |
-| Privacy (no upload) | No | No | No | **Yes** |
-| Works offline | No | No | No | **Yes (after model cache)** |
-| Integrated with editor | No (single purpose) | Yes (full suite) | Yes (full suite) | **Yes (resize, crop, adjust)** |
-| Free / no account | Limited free tier | Limited free tier | Limited free tier | **Unlimited, no account** |
-| Processing speed | ~2s (server GPU) | ~2s (server GPU) | ~3s (server GPU) | ~3-5s (client WASM) |
-| Quality on hard cases | Excellent | Excellent | Good | Good (ISNET model) |
-| Batch processing | Paid | Paid | Paid | No (by design) |
+| Feature | Photopea (web) | Pixlr E (web) | Canva (web) | WebImager v3 (plan) |
+|---------|---------------|---------------|-------------|---------------------|
+| Blur | Gaussian + lens + motion blur | Gaussian with radius | Simple blur slider | Single Gaussian blur slider via `ctx.filter` |
+| Sharpen | Unsharp mask (amount/radius/threshold) | Sharpen + unsharp mask | None | Single sharpen slider via convolution kernel |
+| Filter presets | None (manual adjustments) | ~20 presets with strength | 15+ presets with strength | 8-10 curated presets, no strength slider at launch |
+| Text overlay | Full rich text, layers, effects | Text with fonts, effects | Full text with effects | Single-style text, drag to position, edit until applied |
+| Freehand drawing | Full brush engine (pressure, opacity) | Pencil/brush tools | Draw tool | Freehand pen, uniform width, smooth curves |
+| Shape annotation | Full vector shapes | Basic shapes | Extensive library | Arrow, rectangle, circle, line |
+| Edit workflow | Layers (always editable) | Layers (always editable) | Layers (always editable) | Overlay-based edit-until-applied |
 
-**WebImager's competitive position:** Cannot beat server-side tools on speed or quality for hard cases (hair on complex backgrounds). Wins on privacy, cost (truly free), offline capability, and the integrated editor workflow. The target user is someone who wants to remove a background, adjust the result, and download -- all without signing up or uploading their image to a server.
+**Positioning:** WebImager does not compete with Photopea/Pixlr on feature depth. The value is zero-install, zero-account, privacy-first, fast. These v3.0 features move it from "basic editor" to "capable editor" while keeping the interface simple and the architecture client-side.
 
 ## Sources
 
-- [IMG.LY: 20x Faster Browser Background Removal with ONNX Runtime](https://img.ly/blog/browser-background-removal-using-onnx-runtime-webgpu/) -- technical architecture, WebGPU performance benchmarks
-- [@imgly/background-removal on npm](https://www.npmjs.com/package/@imgly/background-removal) -- primary client-side library, API reference
-- [imgly/background-removal-js on GitHub](https://github.com/imgly/background-removal-js) -- source, configuration options, model details
-- [Photoroom vs remove.bg comparison](https://www.photoroom.com/blog/photoroom-or-removebg) -- competitor feature analysis
-- [remove.bg vs Photoroom definitive comparison](https://vertu.com/guides/remove-bg-vs-photoroom-the-definitive-comparison/) -- feature expectations
-- [Top 10 AI Background Removal Tools 2026](https://www.scmgalaxy.com/tutorials/top-10-ai-background-removal-tools-in-2025-features-pros-cons-comparison/) -- market landscape
-- [Client-Side AI in 2025](https://medium.com/@sauravgupta2800/client-side-ai-in-2025-what-i-learned-running-ml-models-entirely-in-the-browser-aa12683f457f) -- performance benchmarks, IndexedDB caching patterns
-- [Clipping Magic](https://clippingmagic.com/) -- edge refinement feature reference
-- [Webkul: Browser Based Background Remover using ONNX](https://webkul.com/blog/browser-based-background-remover-using-onnx/) -- implementation patterns
+- [MDN: CanvasRenderingContext2D.filter](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/filter) -- HIGH confidence. Authoritative reference for supported CSS filter functions on canvas. Confirms blur() is supported, sharpen is not.
+- [web.dev: Image filters with canvas](https://web.dev/canvas-imagefilters/) -- HIGH confidence. Convolution kernel patterns, sharpen kernel values `[0,-1,0,-1,5,-1,0,-1,0]`, getImageData/putImageData workflow.
+- [MDN: Pixel manipulation with canvas](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Pixel_manipulation_with_canvas) -- HIGH confidence. ImageData API reference for sharpen implementation.
+- [MDN: Drawing shapes with canvas](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Drawing_shapes) -- HIGH confidence. Path, arc, rect, and shape drawing reference.
+- [MDN: CSS filter functions](https://developer.mozilla.org/en-US/docs/Web/CSS/filter) -- HIGH confidence. Complete list of filter functions (sepia, hue-rotate, etc.) used in preset recipes.
+- [IMG.LY: How to Apply Custom Image Filters in JavaScript](https://img.ly/blog/how-to-apply-filters-in-javascript/) -- MEDIUM confidence. Practical convolution filter implementation patterns.
+- [Coding Dude: CSS Image Effects for Vintage Photos](https://www.coding-dude.com/wp/css/css-image-effects/) -- MEDIUM confidence. Warm/cool/vintage filter recipes using CSS filter combinations.
+- [Envato Tuts+: Canvas Drawing Tool with Vanilla JavaScript](https://webdesign.tutsplus.com/how-to-create-a-canvas-drawing-tool-with-vanilla-javascript--cms-108856t) -- MEDIUM confidence. Freehand drawing implementation patterns without libraries.
 
 ---
-*Feature research for: In-browser AI background removal (v2.0 milestone)*
+*Feature research for: WebImager v3.0 Editing Power (blur/sharpen, presets, text, drawing)*
 *Researched: 2026-03-14*

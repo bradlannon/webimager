@@ -1,413 +1,561 @@
-# Architecture: In-Browser Background Removal Integration
+# Architecture Research
 
-**Domain:** AI-powered background removal for existing Canvas 2D image editor
+**Domain:** Browser-based image editor -- v3.0 editing power features integration
 **Researched:** 2026-03-14
-**Overall confidence:** HIGH
+**Confidence:** HIGH
 
-## Executive Summary
-
-Background removal integrates into WebImager's existing non-destructive pipeline as an **alpha mask stored alongside the source image**, applied during rendering via Canvas 2D `globalCompositeOperation: 'destination-in'`. The mask is generated once by a Transformers.js model running in a Web Worker, cached in the Zustand store, and composited at render time after transforms/crop and before adjustments. This keeps the operation non-destructive (the user can toggle it on/off), avoids pixel-baking, and fits cleanly into the existing `renderToCanvas()` flow.
-
-## Existing Pipeline (Current State)
+## Existing Architecture (Context for New Features)
 
 ```
-sourceImage (ImageBitmap)
-    |
-    v
-renderToCanvas(ctx, source, transforms, adjustments, crop)
-    |
-    +-- Step 1: rotation/flip transforms (ctx.rotate, ctx.scale)
-    +-- Step 2: crop extraction (offscreen canvas when crop active)
-    +-- Step 3: ctx.filter adjustments (brightness, contrast, saturation, greyscale)
-    |
-    v
-  <canvas> display
+Zustand Store (EditorStore)
+  sourceImage, transforms, adjustments, cropRegion, backgroundMask, replacementColor
+      |
+      v
+useRenderPipeline (hook) -- subscribes to store slices
+      |
+      v
+renderToCanvas() -- pure function
+  Step 1: Apply transforms (rotate, flip)
+  Step 2: Apply crop (extract region)
+  Step 3: Apply ctx.filter (brightness, contrast, saturation, greyscale)
+  Step 4: Apply background mask (destination-in compositing)
+  Step 5: Fill replacement color (destination-over)
+      |
+      v
+<canvas> element -- displayed with CSS zoom/pan transform
+      |
+      v
+CropOverlay -- HTML overlay positioned over canvas (edit-until-apply pattern)
 ```
 
-State shape:
-```
-EditorStore {
-  sourceImage: ImageBitmap
-  transforms: { rotation, flipH, flipV }
-  adjustments: { brightness, contrast, saturation, greyscale }
-  cropRegion: CropRegion | null
-  cropMode: boolean
+Key architectural facts:
+- `renderToCanvas()` is a pure function called by `useRenderPipeline` on every relevant state change
+- `ctx.filter` provides GPU-accelerated CSS filter syntax (brightness, contrast, saturate, grayscale)
+- Crop uses an "edit-until-apply" pattern: `cropMode` boolean toggles overlay, `applyCrop` commits
+- `downloadImage()` calls the same `renderToCanvas()` to produce export output
+- Canvas component wraps the `<canvas>` in a div with CSS `transform: translate() scale()` for zoom/pan
+- OverlayPanel slides up from bottom bar with glassmorphism styling
+- BottomBar has tab navigation; each tab maps to a panel component
+
+## How New Features Integrate
+
+### Feature 1: Blur/Sharpen Filters
+
+**Integration point:** Extend `Adjustments` interface and `buildFilterString()`.
+
+Canvas 2D `ctx.filter` natively supports `blur()`. Sharpen has no CSS filter equivalent -- implement as an unsharp-mask convolution kernel applied via `getImageData`/`putImageData`.
+
+**Store changes:**
+```typescript
+// In types/editor.ts -- extend Adjustments
+export interface Adjustments {
+  brightness: number;
+  contrast: number;
+  saturation: number;
+  greyscale: boolean;
+  blur: number;        // NEW: 0-20 px radius
+  sharpen: number;     // NEW: 0-100 intensity
 }
 ```
 
-## Proposed Pipeline (With Background Removal)
+**Render pipeline changes:**
+- `buildFilterString()`: Append `blur(${blur}px)` when blur > 0
+- Sharpen: After the main `drawImage` with `ctx.filter`, if `sharpen > 0`, apply a 3x3 convolution kernel to the canvas pixels via `getImageData`/`putImageData`. This must happen after blur (so you can combine blur+sharpen for a "clarity" effect) but before mask compositing.
 
+**New render pipeline step order:**
 ```
-sourceImage (ImageBitmap)
-    |
-    v
-renderToCanvas(ctx, source, transforms, adjustments, crop, alphaMask?)
-    |
-    +-- Step 1: rotation/flip transforms
-    +-- Step 2: crop extraction
-    +-- Step 3: alpha mask compositing  <-- NEW
-    +-- Step 4: ctx.filter adjustments (second drawImage pass when mask active)
-    |
-    v
-  <canvas> display (checkerboard CSS behind for transparency)
+transforms -> crop -> ctx.filter (brightness/contrast/saturation/greyscale/blur) -> sharpen convolution -> mask -> replacement color
 ```
 
-### Why This Order
+**UI:** Add blur and sharpen sliders to `AdjustmentControls.tsx` -- same pattern as existing brightness/contrast/saturation sliders. No new tab needed.
 
-The alpha mask must be applied **after** transforms and crop, **before** ctx.filter adjustments:
+**New files:**
+- `src/utils/sharpen.ts` -- convolution kernel function (applySharpen)
 
-1. **After transforms**: The mask is generated from the source image at its original orientation. When the user rotates/flips, the mask must be rotated/flipped identically. By compositing the mask after the same rotation/flip transforms are applied to both source and mask, they stay aligned.
+**Modified files:**
+- `src/types/editor.ts` -- extend Adjustments
+- `src/store/editorStore.ts` -- add blur/sharpen defaults and reset
+- `src/utils/canvas.ts` -- add blur to buildFilterString, call sharpen after draw
+- `src/components/AdjustmentControls.tsx` -- add two sliders
 
-2. **After crop**: The crop extracts a region from the transformed image. The mask must be cropped to match. Applying the mask after crop means we only need to draw the relevant portion of the mask.
+### Feature 2: Preset Image Filters
 
-3. **Before adjustments**: `ctx.filter` applies when drawing, not retroactively. If we applied the mask after `ctx.filter`, the filter would have already drawn opaque pixels everywhere. The mask zeroes out alpha on background pixels, and then adjustments modify the remaining foreground colors.
+**Integration point:** New store field `activeFilter`, applied as a CSS filter string composed with existing adjustments via `ctx.filter`.
 
-### Alternative Considered: Pre-baking the mask into sourceImage
+**Architecture decision:** Use CSS `ctx.filter` strings for presets because the existing pipeline already uses `ctx.filter`. Each preset is a named combination of brightness, contrast, saturate, sepia, hue-rotate, and grayscale values. This avoids pixel manipulation entirely and stays GPU-accelerated.
 
-Creating a new ImageBitmap with transparent background pixels baked in. Rejected because:
-- Destroys non-destructive editing (cannot un-remove the background)
-- JPEG sources have no alpha channel; would require conversion
-- Inconsistent with how all other edits work as render-time parameters
+**Store changes:**
+```typescript
+// In types/filters.ts
+export interface FilterPreset {
+  id: string;
+  label: string;
+  filter: string;  // CSS filter string, e.g. "sepia(80%) saturate(120%) contrast(110%)"
+}
 
-## New State Shape
+// In EditorStore -- add:
+activeFilter: string | null;  // preset id, or null for no preset
+```
+
+**Render pipeline changes:**
+- `buildFilterString()` receives both `adjustments` and `activeFilter`. The preset filter string is concatenated with the adjustment filter string. CSS filters compose left-to-right, so preset applies first, then user adjustments layer on top. This gives users the ability to tweak a preset.
+
+**Preset definitions** (hardcoded array, not fetched):
+```typescript
+export const FILTER_PRESETS: FilterPreset[] = [
+  { id: 'sepia', label: 'Sepia', filter: 'sepia(90%)' },
+  { id: 'vintage', label: 'Vintage', filter: 'sepia(40%) contrast(90%) brightness(110%) saturate(80%)' },
+  { id: 'warm', label: 'Warm', filter: 'sepia(20%) saturate(140%) brightness(105%)' },
+  { id: 'cool', label: 'Cool', filter: 'saturate(80%) hue-rotate(15deg) brightness(105%)' },
+  { id: 'bw', label: 'B&W', filter: 'grayscale(100%) contrast(120%)' },
+  { id: 'fade', label: 'Fade', filter: 'contrast(80%) brightness(115%) saturate(70%)' },
+  { id: 'vivid', label: 'Vivid', filter: 'saturate(180%) contrast(115%)' },
+  { id: 'dramatic', label: 'Dramatic', filter: 'contrast(140%) brightness(90%) saturate(110%)' },
+  { id: 'noir', label: 'Noir', filter: 'grayscale(100%) contrast(150%) brightness(90%)' },
+  { id: 'soft', label: 'Soft', filter: 'contrast(90%) brightness(110%) blur(0.5px)' },
+];
+```
+
+**UI:** New "Filters" tab in BottomBar. Shows a horizontal scrollable row of thumbnail previews (tiny canvas elements rendered with each filter applied to a downscaled source image). Tap to select, tap again to deselect.
+
+**New files:**
+- `src/types/filters.ts` -- FilterPreset type and FILTER_PRESETS array
+- `src/components/FilterControls.tsx` -- filter selection UI with thumbnail previews
+
+**Modified files:**
+- `src/store/editorStore.ts` -- add activeFilter state, setActiveFilter action, reset in setImage/resetAll
+- `src/utils/canvas.ts` -- buildFilterString accepts activeFilter, prepends to adjustment filters
+- `src/components/BottomBar.tsx` -- add Filters tab
+- `src/hooks/useRenderPipeline.ts` -- subscribe to activeFilter
+
+### Feature 3: Text Overlay (Editable Until Applied)
+
+**Integration point:** New overlay layer rendered as an HTML element positioned over the canvas (same pattern as CropOverlay), with an "Apply" action that burns text into the render pipeline data.
+
+**Architecture decision:** Do NOT render text on the canvas during editing. Render a positioned HTML `<div>` (or `<textarea>` for editing) over the canvas, using CSS transforms matching the canvas display scaling. When the user clicks "Apply", the text moves to `appliedTexts` in the store and gets rendered by the pipeline via `ctx.fillText`. This avoids re-rendering the full pipeline on every text drag/edit.
+
+**Why HTML overlay, not canvas text during editing:**
+1. Canvas `fillText` requires full pipeline re-render on every keystroke/drag
+2. HTML gives native text selection, cursor, and font rendering
+3. CSS positioning over the canvas is already proven by CropOverlay
+4. Text coordinates stored as percentages (like crop) survive zoom/resize
+
+**Store changes:**
+```typescript
+// In types/text.ts
+export interface TextOverlay {
+  id: string;
+  text: string;
+  x: number;          // 0-100 percentage from left
+  y: number;          // 0-100 percentage from top
+  fontFamily: string;
+  fontSize: number;    // in px relative to source image height
+  color: string;
+  bold: boolean;
+  italic: boolean;
+  opacity: number;     // 0-1
+}
+
+// In EditorStore:
+pendingText: TextOverlay | null;     // currently being edited (not yet applied)
+textMode: boolean;                    // like cropMode
+appliedTexts: TextOverlay[];          // rendered by the pipeline
+```
+
+**Render pipeline changes:**
+- After mask compositing and replacement color, iterate `appliedTexts` and draw each with `ctx.fillText()` / `ctx.font` / `ctx.fillStyle`.
+- `pendingText` is NOT rendered by the pipeline -- it is shown as an HTML overlay only.
+
+**Edit-until-apply pattern (matching crop):**
+1. User enters text mode (`textMode = true`)
+2. User types text, drags to position, adjusts font/size/color
+3. Changes update `pendingText` in store (HTML overlay re-renders, canvas does NOT re-render)
+4. User clicks "Apply Text" -> `pendingText` moves to `appliedTexts[]`, `textMode` set to false
+5. Pipeline re-renders with the text drawn in
+6. Or user clicks "Cancel" -> `pendingText` set to null, `textMode` set to false
+
+**Coordinate system:** Percentage-based (0-100) like crop coordinates. Font size stored relative to source image dimensions so it scales correctly during render.
+
+**UI:** New "Text" tab in BottomBar. Panel shows: text input, font family picker (5-6 web-safe fonts), size slider, color picker, bold/italic toggles, Apply/Cancel buttons. The text itself appears as a draggable HTML overlay on the canvas.
+
+**New files:**
+- `src/types/text.ts` -- TextOverlay interface, defaults
+- `src/components/TextOverlayElement.tsx` -- HTML overlay component (draggable, editable)
+- `src/components/TextControls.tsx` -- bottom panel UI for text properties
+- `src/utils/text.ts` -- renderTextsToCanvas() helper for drawing applied texts
+
+**Modified files:**
+- `src/store/editorStore.ts` -- add pendingText, textMode, appliedTexts state and actions
+- `src/utils/canvas.ts` -- renderToCanvas accepts appliedTexts, draws them after compositing
+- `src/hooks/useRenderPipeline.ts` -- subscribe to appliedTexts (NOT pendingText)
+- `src/components/Canvas.tsx` -- render TextOverlayElement component when textMode is true
+- `src/components/BottomBar.tsx` -- add Text tab, handle text mode transitions
+- `src/utils/download.ts` -- pass appliedTexts to renderToCanvas
+
+### Feature 4: Freehand Drawing and Shape Annotation (Editable Until Applied)
+
+**Integration point:** Second overlay canvas layered on top of the main canvas for real-time stroke rendering, with an "Apply" action that composites the drawing canvas content into the render pipeline.
+
+**Architecture decision:** Use a SEPARATE transparent `<canvas>` element overlaid on the main canvas for drawing. This is critical because:
+1. Freehand drawing needs immediate pixel response (pointer events -> lineTo -> stroke)
+2. Re-rendering the full pipeline per mouse move would be far too slow
+3. A separate overlay canvas can be cleared/redrawn independently
+4. When "Apply" is clicked, the overlay canvas content gets composited into the pipeline
+
+**Store changes:**
+```typescript
+// In types/drawing.ts
+export interface DrawingPath {
+  points: Array<{ x: number; y: number }>;  // percentage coordinates
+  color: string;
+  thickness: number;    // px relative to source image height
+  tool: 'pen' | 'arrow' | 'rectangle' | 'circle' | 'line';
+}
+
+// In EditorStore:
+drawMode: boolean;
+drawTool: 'pen' | 'arrow' | 'rectangle' | 'circle' | 'line';
+drawColor: string;
+drawThickness: number;
+pendingPaths: DrawingPath[];              // paths on the overlay canvas (not yet applied)
+appliedDrawingData: ImageData | null;     // flattened pixel data from previous applies
+```
+
+**Why store paths (not just ImageData) for pending state:**
+- Paths can be individually undone (pop last path)
+- Shapes (rect, circle, arrow) can be previewed during drag
+- Percentage coordinates survive zoom changes
+
+**Render pipeline changes:**
+- After text rendering, if `appliedDrawingData` exists, composite it via `drawImage` from an offscreen canvas onto the main canvas.
+- `pendingPaths` are NOT rendered by the main pipeline -- they live on the overlay canvas only.
+
+**Edit-until-apply pattern:**
+1. User enters draw mode (`drawMode = true`)
+2. Overlay canvas appears, sized to match main canvas display dimensions
+3. Pointer events on overlay canvas: pen tool records points, shape tools show rubber-band preview
+4. Each completed stroke/shape adds a `DrawingPath` to `pendingPaths`
+5. Overlay canvas re-renders all `pendingPaths` on change
+6. "Undo" pops last path, re-renders overlay from remaining paths
+7. "Apply" -> render pendingPaths at source-image resolution onto an offscreen canvas, composite with any existing `appliedDrawingData`, store result, clear pendingPaths, set `drawMode = false`
+8. "Cancel" -> clear pendingPaths, set `drawMode = false`
+
+**Coordinate mapping:** Display canvas has CSS sizing different from pixel dimensions. Pointer events give screen coordinates. Convert to percentage of displayed canvas size, then during apply, map percentages to source image pixel coordinates. Same approach as crop.
+
+**Shape rendering details:**
+- **Pen:** `beginPath`, `moveTo`, sequential `lineTo` through points, `stroke` with `lineCap: 'round'`, `lineJoin: 'round'`
+- **Line:** `moveTo` first point, `lineTo` last point, `stroke`
+- **Rectangle:** `strokeRect` from start point to end point
+- **Circle:** `arc` centered at start point, radius = distance to current point
+- **Arrow:** Line with arrowhead triangle at endpoint (two short lines at 30-degree angles)
+
+**UI:** New "Draw" tab in BottomBar. Panel shows: tool picker (pen/arrow/rect/circle/line icons), color picker, thickness slider, Undo button, Apply/Cancel buttons.
+
+**New files:**
+- `src/types/drawing.ts` -- DrawingPath interface, tool types
+- `src/components/DrawingOverlay.tsx` -- overlay canvas with pointer event handlers
+- `src/components/DrawControls.tsx` -- bottom panel UI for draw tools
+- `src/utils/drawing.ts` -- renderPathToCanvas(), renderAllPaths(), applyDrawingToSource()
+
+**Modified files:**
+- `src/store/editorStore.ts` -- add drawing state and actions
+- `src/utils/canvas.ts` -- renderToCanvas accepts appliedDrawingData, composites after text
+- `src/hooks/useRenderPipeline.ts` -- subscribe to appliedDrawingData
+- `src/components/Canvas.tsx` -- render DrawingOverlay when drawMode is true
+- `src/components/BottomBar.tsx` -- add Draw tab, handle draw mode transitions
+- `src/utils/download.ts` -- pass appliedDrawingData to renderToCanvas
+
+## Updated Render Pipeline Order
+
+```
+renderToCanvas(ctx, source, options)
+
+Step 1: Apply transforms (rotate, flip) .................. [EXISTING]
+Step 2: Apply crop (extract region) ...................... [EXISTING]
+Step 3: Apply ctx.filter (adjustments + activeFilter) .... [MODIFIED - add blur, compose preset]
+Step 4: Draw image to canvas ............................. [EXISTING]
+Step 5: Apply sharpen convolution ........................ [NEW - if sharpen > 0]
+Step 6: Apply background mask (destination-in) ........... [EXISTING]
+Step 7: Fill replacement color (destination-over) ........ [EXISTING]
+Step 8: Render applied texts (ctx.fillText) .............. [NEW]
+Step 9: Composite applied drawing data ................... [NEW]
+```
+
+**Ordering rationale:**
+- Filters (blur/sharpen/presets) apply to the image pixels, not to overlaid text/drawings
+- Text and drawings sit "on top" visually, so they render last
+- Text before drawings so drawings can annotate over text if needed
+- Mask and replacement color apply to the base image only -- text/drawings are added after masking so they are always fully visible regardless of background removal state
+
+## Updated Store Shape
 
 ```typescript
-// In types/editor.ts - NEW
-interface BackgroundRemoval {
-  enabled: boolean;          // Toggle on/off without losing mask
-  mask: ImageBitmap | null;  // Alpha mask at source image dimensions
-  status: 'idle' | 'loading-model' | 'processing' | 'ready' | 'error';
-  progress: number;          // 0-100, for model download + inference
-  error: string | null;
-}
-
-// In EditorStore - additions
 interface EditorStore {
-  // ... existing fields ...
-  backgroundRemoval: BackgroundRemoval;
+  // === EXISTING (unchanged) ===
+  sourceImage: ImageBitmap | null;
+  originalFile: File | null;
+  wasDownscaled: boolean;
+  transforms: Transforms;
+  adjustments: Adjustments;          // MODIFIED: adds blur, sharpen fields
+  cropRegion: CropRegion | null;
+  previousCropRegion: CropRegion | null;
+  cropMode: boolean;
+  cropAspectRatio: number | null;
+  zoomLevel: number;
+  panOffset: { x: number; y: number };
+  backgroundRemoved: boolean;
+  backgroundMask: ImageData | null;
+  replacementColor: string | null;
 
-  // New actions
-  removeBackground: () => void;        // Triggers Web Worker inference
-  toggleBackground: () => void;        // Toggles enabled on/off
-  clearBackgroundRemoval: () => void;   // Removes mask entirely
+  // === NEW: Preset filters ===
+  activeFilter: string | null;       // preset id
+
+  // === NEW: Text overlay ===
+  textMode: boolean;
+  pendingText: TextOverlay | null;
+  appliedTexts: TextOverlay[];
+
+  // === NEW: Drawing/annotation ===
+  drawMode: boolean;
+  drawTool: DrawingPath['tool'];
+  drawColor: string;
+  drawThickness: number;
+  pendingPaths: DrawingPath[];
+  appliedDrawingData: ImageData | null;
 }
 ```
 
-The mask is stored as an `ImageBitmap` at the **same dimensions as sourceImage**. This means:
-- It does not need to be regenerated when transforms change
-- It can be drawn with identical rotation/flip/crop transforms
-- It is invalidated only when `sourceImage` changes (new image, resize)
-
-## Component Boundaries
-
-| Component | Responsibility | Status |
-|-----------|---------------|--------|
-| `renderToCanvas()` in `utils/canvas.ts` | Composites alpha mask into render pipeline | MODIFIED |
-| `useRenderPipeline.ts` | Subscribes to `backgroundRemoval.enabled` + `.mask` | MODIFIED |
-| `BackgroundRemovalControls.tsx` | UI for remove/toggle/progress/status | NEW |
-| `Sidebar.tsx` | Adds BackgroundRemovalControls section | MODIFIED |
-| `bgRemovalWorker.ts` | Web Worker running Transformers.js inference | NEW |
-| `useBgRemoval.ts` | Hook managing worker lifecycle and store updates | NEW |
-| `editorStore.ts` | New state slice for backgroundRemoval | MODIFIED |
-| `types/editor.ts` | New BackgroundRemoval interface | MODIFIED |
-| `download.ts` | Already calls renderToCanvas; gets mask for free | MINOR CHANGE (JPEG fallback) |
-| `Canvas.tsx` | Already uses checkerboard CSS class for transparency | UNCHANGED |
-
-## Detailed Data Flow
-
-### 1. User Clicks "Remove Background"
+## Updated Component Tree
 
 ```
-BackgroundRemovalControls (button click)
-    |
-    v
-useBgRemoval hook
-    |-- extracts pixel data from sourceImage via offscreen canvas
-    |-- sets store status: 'loading-model'
-    |-- posts ImageData buffer to Web Worker (transferable, zero-copy)
-    |
-    v
-bgRemovalWorker.ts (Web Worker thread)
-    |-- imports @huggingface/transformers (AutoModel, AutoProcessor, RawImage)
-    |-- loads briaai/RMBG-1.4 model (cached after first download)
-    |-- posts progress messages back to main thread
-    |-- runs inference: pixel_values -> model -> output tensor
-    |-- converts output tensor to single-channel mask (0-255)
-    |-- posts mask ArrayBuffer back (transferable, zero-copy)
-    |
-    v
-useBgRemoval hook (main thread)
-    |-- receives mask ArrayBuffer from worker
-    |-- converts single-channel mask to RGBA ImageBitmap (R=G=B=255, A=mask)
-    |-- updates store: { mask: ImageBitmap, status: 'ready', enabled: true }
-    |
-    v
-useRenderPipeline reacts to state change
-    |-- passes mask to renderToCanvas()
-    |-- canvas re-renders with transparent background
+<Editor>
+  <TopBar />
+  <Canvas>
+    <canvas ref={canvasRef} />              -- main render pipeline output
+    <CropOverlay />                         -- [EXISTING] shown when cropMode
+    <TextOverlayElement />                  -- [NEW] shown when textMode
+    <DrawingOverlay />                      -- [NEW] shown when drawMode
+  </Canvas>
+  <ZoomControls />
+  <BottomBar>
+    tabs: crop | transform | adjustments | filters | background | text | draw | resize | download
+                                              ^^^^^^^                  ^^^^   ^^^^
+                                              NEW                      NEW    NEW
+    <OverlayPanel>
+      <CropPanel />
+      <TransformControls />
+      <AdjustmentControls />                -- MODIFIED: add blur/sharpen sliders
+      <FilterControls />                    -- NEW
+      <BackgroundControls />
+      <TextControls />                      -- NEW
+      <DrawControls />                      -- NEW
+      <ResizeControls />
+      <DownloadPanel />
+    </OverlayPanel>
+  </BottomBar>
+</Editor>
 ```
 
-### 2. renderToCanvas with Mask (Modified Algorithm)
+## Tab Ordering Rationale
 
-New signature:
+```
+crop | transform | adjustments | filters | background | text | draw | resize | download
+```
+
+- Crop/Transform/Adjustments stay first (fundamental edits applied to base image)
+- Filters after adjustments (both modify image appearance, natural grouping)
+- Background stays before overlays (affects base image layer)
+- Text before Draw (more commonly used annotation type)
+- Resize and Download stay last (final output steps)
+
+**9 tabs on mobile:** Icons-only on mobile is already the pattern. If testing reveals crowding, consider grouping "Text" and "Draw" under a single "Annotate" tab with a sub-toggle. Start with flat tabs and evaluate.
+
+## Architectural Patterns
+
+### Pattern 1: Edit-Until-Apply with Overlay
+
+**What:** Interactive editing happens on an HTML/canvas overlay positioned over the main canvas. The main render pipeline does NOT re-run during editing. Only when the user clicks "Apply" does the edit get committed to store state that triggers a pipeline re-render.
+
+**When to use:** Text overlay, drawing/annotation, crop (already uses this).
+
+**Why:** Decouples interactive editing (60fps needed) from the full render pipeline (potentially expensive with convolutions, mask compositing, multiple offscreen canvases).
+
+```
+User interaction -> update pendingState (overlay re-renders) -> NO pipeline render
+User clicks Apply -> move pending to applied state -> pipeline re-renders once
+```
+
+### Pattern 2: Percentage-Based Coordinates
+
+**What:** All position/size values stored as percentages (0-100) of the source image dimensions, not pixel values.
+
+**When to use:** Crop regions, text positions, drawing paths.
+
+**Why:** Resilient to display scaling, zoom changes, window resizes, and the gap between canvas pixel dimensions and CSS display dimensions.
+
+### Pattern 3: Overlay Canvas for Real-Time Drawing
+
+**What:** A separate transparent `<canvas>` element layered over the main canvas for freehand drawing and shape preview. NOT the same canvas as the render pipeline output.
+
+**When to use:** Freehand drawing, shape rubber-banding during drag.
+
+**Why:** Drawing requires immediate pixel feedback on pointer move. Re-rendering the full pipeline per mouse move would blow the 16ms frame budget. The overlay canvas only contains pending strokes and can be cleared/redrawn cheaply.
+
+**Implementation sketch:**
 ```typescript
-export function renderToCanvas(
-  ctx: CanvasRenderingContext2D,
-  source: ImageBitmap,
-  transforms: Transforms,
-  adjustments?: Adjustments,
-  crop?: CropRegion,
-  alphaMask?: ImageBitmap | null  // NEW parameter
-): void
+// DrawingOverlay.tsx
+<canvas
+  ref={overlayRef}
+  style={{
+    position: 'absolute', top: 0, left: 0,
+    width: '100%', height: '100%',
+    pointerEvents: drawMode ? 'auto' : 'none'
+  }}
+  onPointerDown={startStroke}
+  onPointerMove={continueStroke}
+  onPointerUp={endStroke}
+/>
 ```
 
-**No-crop path (modified):**
+### Pattern 4: Compositing Applied Overlays at Render Time
+
+**What:** Applied text and drawing data are rendered EVERY TIME the pipeline runs, not baked into the source image.
+
+**Why not bake immediately:** Because the user can still adjust brightness/contrast, change crop, rotate, etc. If text/drawing were baked into sourceImage, they would be affected by filters and transforms. Instead, they are composited AFTER all base-image processing, so they always appear sharp and correctly positioned.
+
+**Trade-off:** More work per render (drawing text and compositing drawing data). But this is cheap compared to the rest of the pipeline, and it keeps edits truly non-destructive.
+
+**Scaling concern:** If someone applies 50+ text overlays and 200+ drawing paths, compositing cost adds up. Not a concern for this use case -- this is a quick-edit tool, not a design application.
+
+## Anti-Patterns
+
+### Anti-Pattern 1: Rendering Pending Edits in the Main Pipeline
+
+**What people do:** Re-run renderToCanvas() on every text keystroke or drawing mouse move.
+**Why it is wrong:** The pipeline does multiple offscreen canvas operations, convolutions, and compositing steps. At 60fps pointer events, this creates visible jank.
+**Do this instead:** Use overlay elements (HTML for text, separate canvas for drawing) that update independently of the main pipeline.
+
+### Anti-Pattern 2: Baking Overlays into Source Image on Apply
+
+**What people do:** When user clicks "Apply Text", render text onto source ImageBitmap and replace it.
+**Why it is wrong:** Destroys non-destructive editing. Subsequent brightness changes would affect the text. Filter presets would distort text colors. Undo becomes impossible without storing full image snapshots.
+**Do this instead:** Store applied overlays as data (`TextOverlay[]`, `ImageData`) and composite them at render time, after all base-image processing.
+
+### Anti-Pattern 3: Using Fabric.js or Konva.js for Drawing
+
+**What people do:** Pull in a canvas abstraction library for the drawing feature.
+**Why it is wrong for this project:** The existing architecture uses vanilla Canvas 2D with a custom render pipeline. Adding Fabric.js would create two competing canvas management systems. The drawing requirements (pen + 4 shapes) are simple enough for vanilla Canvas 2D. The project explicitly decided against these libraries (see Key Decisions in PROJECT.md: "Vanilla Canvas API -- image editors don't need object/layer abstractions").
+**Do this instead:** Vanilla Canvas 2D on a separate overlay canvas with simple pointer event handlers.
+
+### Anti-Pattern 4: Pixel Coordinates for Overlay Positioning
+
+**What people do:** Store text position as `{ x: 450, y: 230 }` in pixels.
+**Why it is wrong:** Breaks when user zooms, resizes window, or rotates image. The display canvas CSS size differs from its pixel dimensions. Zoom applies a CSS `scale()` transform that changes the visual position without changing pixel coordinates.
+**Do this instead:** Percentage-based coordinates (0-100) mapped to source image dimensions, exactly as crop already does.
+
+## Mode Conflicts and Resolution
+
+Only one mode should be active at a time (`cropMode`, `textMode`, `drawMode`). When switching:
+
 ```
-1. Set canvas size to rotated dimensions
-2. ctx.save()
-3. Apply rotation/flip transforms (translate, rotate, scale)
-4. drawImage(source)  -- draws opaque image
-5. IF alphaMask:
-   a. globalCompositeOperation = 'destination-in'
-   b. drawImage(alphaMask) with same transform offset  -- keeps only foreground
-   c. globalCompositeOperation = 'source-over'  -- reset
-6. ctx.restore()
-7. IF adjustments AND alphaMask:
-   a. Copy canvas to temp canvas
-   b. clearRect on main canvas
-   c. ctx.filter = buildFilterString(adjustments)
-   d. drawImage(tempCanvas, 0, 0)  -- redraws with filter applied
-8. IF adjustments AND NOT alphaMask:
-   a. (existing path: filter was set before drawImage in step 4)
+Switching TO crop mode:
+  - If textMode active: auto-apply pending text (or discard if empty), exit text mode
+  - If drawMode active: auto-apply pending paths (or discard if empty), exit draw mode
+
+Switching TO text mode:
+  - If cropMode active: auto-apply crop, exit crop mode
+  - If drawMode active: auto-apply pending paths, exit draw mode
+
+Switching TO draw mode:
+  - If cropMode active: auto-apply crop, exit crop mode
+  - If textMode active: auto-apply pending text, exit text mode
 ```
 
-The extra canvas copy in step 7 only occurs when BOTH background removal AND adjustments are active. When neither is active, the existing fast path is untouched.
+This matches the existing crop behavior where switching away from the crop tab auto-saves. Implement via an `exitAllModes()` helper called before entering any new mode.
 
-**Crop path (modified):**
-```
-1. Render source with rotation/flip to offscreen canvas (existing)
-2. IF alphaMask:
-   a. Apply mask to offscreen canvas via destination-in  -- NEW
-3. Extract crop region from offscreen to output canvas (existing)
-4. Apply ctx.filter adjustments (existing, but needs second-pass if mask active)
-```
-
-### 3. Mask as RGBA ImageBitmap
-
-When the worker returns single-channel mask data (Uint8ClampedArray, one byte per pixel, 0=background, 255=foreground), the main thread converts it:
+## renderToCanvas Signature Refactor
 
 ```typescript
-function maskToImageBitmap(
-  maskData: Uint8ClampedArray,
-  width: number,
-  height: number
-): Promise<ImageBitmap> {
-  const rgba = new Uint8ClampedArray(width * height * 4);
-  for (let i = 0; i < maskData.length; i++) {
-    rgba[i * 4]     = 255;          // R (white)
-    rgba[i * 4 + 1] = 255;          // G
-    rgba[i * 4 + 2] = 255;          // B
-    rgba[i * 4 + 3] = maskData[i];  // A = mask value
-  }
-  return createImageBitmap(new ImageData(rgba, width, height));
+// CURRENT (v2.0) -- 7 positional parameters
+renderToCanvas(ctx, source, transforms, adjustments?, crop?, backgroundMask?, replacementColor?)
+
+// PROPOSED (v3.0) -- options object
+interface RenderOptions {
+  transforms: Transforms;
+  adjustments?: Adjustments;
+  crop?: CropRegion;
+  backgroundMask?: ImageData | null;
+  replacementColor?: string | null;
+  activeFilter?: string | null;
+  appliedTexts?: TextOverlay[];
+  appliedDrawingData?: ImageData | null;
 }
+
+renderToCanvas(ctx: CanvasRenderingContext2D, source: ImageBitmap, options: RenderOptions): void
 ```
 
-This ImageBitmap is stored in the Zustand store and drawn with `globalCompositeOperation: 'destination-in'`, which retains destination pixels only where the mask has non-zero alpha.
+Do this refactor at the START of v3.0 work (before adding any features) to avoid churning the function signature with each feature addition. Update all call sites: useRenderPipeline, downloadImage, applyResize.
 
-## Web Worker Architecture
+## Build Order (Dependency-Driven)
 
-### Why a Web Worker
+### Step 0: Refactor renderToCanvas Signature
 
-Transformers.js model inference takes 2-10 seconds depending on image size and device. Running on the main thread would freeze the UI completely. The Web Worker:
+**Build first because:** Every subsequent feature adds parameters. Refactoring to an options object now prevents 4 rounds of signature changes. All existing call sites (useRenderPipeline, downloadImage, applyResize) updated once.
 
-- Keeps the UI responsive during inference
-- Allows progress reporting via postMessage
-- Model stays loaded in worker memory for subsequent uses
-- Worker can be terminated on component unmount
+### Step 1: Blur/Sharpen
 
-### Worker Implementation Pattern
+**Build second because:**
+- Extends existing Adjustments interface (establishes the pattern for store changes)
+- Modifies `buildFilterString()` which preset filters will also modify
+- Sharpen convolution introduces pixel-level processing, validating that the pipeline can handle post-draw ImageData operations
+- No UI pattern changes needed (just more sliders in existing panel)
+- Lowest risk, highest confidence
 
-```typescript
-// src/workers/bgRemovalWorker.ts
-import { AutoModel, AutoProcessor, RawImage, env } from '@huggingface/transformers';
+### Step 2: Preset Filters
 
-env.backends.onnx.wasm.proxy = false; // We ARE the worker, no nested proxy
+**Build third because:**
+- Depends on the updated `buildFilterString` from Step 1
+- Simple store addition (one field: `activeFilter`)
+- Introduces a new tab in BottomBar (establishes the pattern for text/draw tabs)
+- No overlay or mode complexity
 
-let model: Awaited<ReturnType<typeof AutoModel.from_pretrained>> | null = null;
-let processor: Awaited<ReturnType<typeof AutoProcessor.from_pretrained>> | null = null;
+### Step 3: Text Overlay
 
-const MODEL_ID = 'briaai/RMBG-1.4';
+**Build fourth because:**
+- Introduces the edit-until-apply overlay pattern for non-crop features
+- Simpler than drawing (no real-time stroke rendering, no multiple tools)
+- Tests the "applied overlays composited at render time" architecture that drawing will also use
+- Validates mode conflict resolution
 
-self.onmessage = async (e: MessageEvent) => {
-  const { type, imageData, width, height } = e.data;
+### Step 4: Drawing/Annotation
 
-  if (type === 'process') {
-    try {
-      if (!model || !processor) {
-        self.postMessage({ type: 'progress', stage: 'loading-model', progress: 10 });
-        model = await AutoModel.from_pretrained(MODEL_ID, { dtype: 'q8' });
-        processor = await AutoProcessor.from_pretrained(MODEL_ID);
-        self.postMessage({ type: 'progress', stage: 'model-ready', progress: 50 });
-      }
+**Build last because:**
+- Most complex feature (multiple tools, real-time pointer rendering, overlay canvas)
+- Depends on the overlay pattern established by text
+- Depends on the "applied data composited at render time" pattern proven by text
+- Drawing overlay canvas must coexist with text overlay and crop overlay (mode exclusivity already solved in Step 3)
 
-      self.postMessage({ type: 'progress', stage: 'processing', progress: 60 });
-      const img = new RawImage(new Uint8ClampedArray(imageData), width, height, 4);
-      const { pixel_values } = await processor(img);
-      const { output } = await model({ input: pixel_values });
+## Invalidation Rules for New State
 
-      const maskRaw = await RawImage.fromTensor(
-        output[0].mul(255).to('uint8')
-      ).resize(width, height);
+| Event | Clear activeFilter? | Clear appliedTexts? | Clear appliedDrawingData? |
+|-------|--------------------|--------------------|--------------------------|
+| New image uploaded | Yes | Yes | Yes |
+| Resize applied | Yes | Yes | Yes |
+| Rotation/flip | No | No | No |
+| Crop change | No | No | No |
+| Adjustment change | No | No | No |
+| Reset all | Yes | Yes | Yes |
 
-      self.postMessage({
-        type: 'result',
-        maskData: maskRaw.data.buffer,
-        width,
-        height,
-      }, [maskRaw.data.buffer]); // Transfer, don't copy
-
-    } catch (error) {
-      self.postMessage({ type: 'error', message: String(error) });
-    }
-  }
-};
-```
-
-### Vite Web Worker Integration
-
-Vite supports Web Workers natively:
-```typescript
-const worker = new Worker(
-  new URL('../workers/bgRemovalWorker.ts', import.meta.url),
-  { type: 'module' }
-);
-```
-
-Vite config may need to exclude transformers from dep optimization:
-```typescript
-// vite.config.ts
-optimizeDeps: {
-  exclude: ['@huggingface/transformers']
-}
-```
-
-## Model Selection
-
-**Recommendation: `briaai/RMBG-1.4` via `@huggingface/transformers`**
-
-| Criterion | RMBG-1.4 (Transformers.js) | @imgly/background-removal | RMBG-2.0 |
-|-----------|---------------------------|---------------------------|-----------|
-| Browser support | Stable, well-tested | Stable | Broken (onnxruntime-web bug) |
-| Model size (quantized) | ~45 MB (q8) | ~45 MB | 366 MB+ (too large) |
-| License | CC non-commercial | AGPL | CC non-commercial |
-| API flexibility | Full control (AutoModel) | High-level only | N/A |
-| WebGPU acceleration | Yes (optional) | Yes | N/A |
-| Ecosystem | Large, active community | Single vendor | Not viable in browser |
-
-**Why RMBG-1.4:** Best quality-to-size ratio for browser use. The q8 quantized model is ~45MB, acceptable as a one-time download cached by the browser. RMBG-2.0 would be better quality but is not viable in-browser (onnxruntime-web compatibility issues and 366MB+ model size).
-
-**Licensing note:** RMBG-1.4 uses a Creative Commons non-commercial license. WebImager is a free, non-commercial static site -- this is acceptable. If commercialization is needed, `Xenova/modnet` (MIT license) is the fallback with lower quality.
-
-## Edge Cases
-
-### Mask Invalidation Rules
-
-| Event | Clear mask? | Reason |
-|-------|-------------|--------|
-| New image uploaded | Yes | Different image, mask is meaningless |
-| Resize applied | Yes | applyResize creates new sourceImage |
-| Rotation/flip | No | Same pixels, just transformed at render time |
-| Crop change | No | Mask applied before crop extraction |
-| Adjustment change | No | Mask is independent of color adjustments |
-| Reset all | Yes | Returns to initial state |
-
-### JPEG Download with Active Mask
-
-JPEG has no alpha channel. When background removal is active and user downloads as JPEG, the transparent background must be composited onto white:
-
-```typescript
-// In download.ts
-if (format === 'image/jpeg' && alphaMask) {
-  // Fill white background first
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  // Then render masked image on top (source-over compositing)
-}
-```
-
-### First-Use Model Download (~45MB)
-
-- Show progress bar during download (worker sends progress messages)
-- Transformers.js caches model via Cache API; subsequent uses load instantly
-- Consider showing estimated download size in UI before user initiates
-- On slow connections, the download could take 10-30 seconds
-
-### Memory Management
-
-- Call `ImageBitmap.close()` on old mask when new mask is generated or image changes
-- Terminate Web Worker on component unmount
-- Model weights (~45MB) stay in worker memory; acceptable for single-page app
-- Peak memory during inference: source pixels + model weights + intermediate tensors
-
-## Build Order
-
-Based on dependency analysis of the existing codebase:
-
-| Step | What | Depends On | Complexity |
-|------|------|------------|------------|
-| 1 | `types/editor.ts` -- BackgroundRemoval interface | Nothing | Low |
-| 2 | `store/editorStore.ts` -- backgroundRemoval state slice + actions | Step 1 | Medium |
-| 3 | `workers/bgRemovalWorker.ts` -- Web Worker with Transformers.js | npm install | High |
-| 4 | `hooks/useBgRemoval.ts` -- Worker lifecycle + store sync | Steps 2, 3 | Medium |
-| 5 | `utils/canvas.ts` -- renderToCanvas mask compositing | Step 1 | Medium |
-| 6 | `hooks/useRenderPipeline.ts` -- Subscribe to mask state | Steps 2, 5 | Low |
-| 7 | `components/BackgroundRemovalControls.tsx` -- UI | Steps 2, 4 | Medium |
-| 8 | `components/Sidebar.tsx` -- Add controls section | Step 7 | Low |
-| 9 | `utils/download.ts` -- JPEG white-background fallback | Step 5 | Low |
-| 10 | Tests -- mask compositing, worker communication | Steps 1-9 | Medium |
-
-## Patterns to Follow
-
-### Pattern 1: Non-Destructive Mask as Render Parameter
-The mask follows the same pattern as transforms and adjustments -- a parameter passed to `renderToCanvas()`, not baked into the source image. Toggle on/off without re-running inference. Download gets mask compositing for free.
-
-### Pattern 2: Web Worker for Heavy Computation
-Worker loads model once, keeps it in memory. Pixel data sent via transferable ArrayBuffer (zero-copy). Progress reported via postMessage. Consistent with browser best practices for ML inference.
-
-### Pattern 3: Store-Driven Reactivity
-Zustand selectors trigger re-renders when mask or enabled state changes:
-```typescript
-const mask = useEditorStore((s) => s.backgroundRemoval.mask);
-const enabled = useEditorStore((s) => s.backgroundRemoval.enabled);
-```
-
-## Anti-Patterns to Avoid
-
-### Anti-Pattern 1: Running Inference on Main Thread
-Transformers.js on the main thread freezes UI for 2-10 seconds. Always use a Web Worker.
-
-### Anti-Pattern 2: Baking Mask into Source Image
-Creating a new ImageBitmap with transparent pixels destroys non-destructive editing and is inconsistent with the existing architecture.
-
-### Anti-Pattern 3: Re-Running Inference on Transform Changes
-The mask maps 1:1 to source image pixels. Rotating or flipping does not change which pixels are foreground. Apply the same transforms to the mask at render time.
-
-### Anti-Pattern 4: Storing Mask as Canvas or ImageData
-Use `ImageBitmap` -- it is transferable, GPU-backed, closeable, and consistent with how `sourceImage` is stored.
+Text and drawing positions are percentage-based, so they survive rotation/flip/crop changes. They are composited after those operations, so the positions remain correct relative to the visible output.
 
 ## Sources
 
-- [Transformers.js Documentation](https://huggingface.co/docs/transformers.js/index) -- HIGH confidence
-- [RMBG-1.4 Model Card](https://huggingface.co/briaai/RMBG-1.4) -- HIGH confidence
-- [RMBG-2.0 Transformers.js compatibility issue](https://github.com/huggingface/transformers.js/issues/1107) -- HIGH confidence
-- [Canvas globalCompositeOperation MDN](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/globalCompositeOperation) -- HIGH confidence
-- [Addy Osmani's bg-remove (reference implementation)](https://github.com/addyosmani/bg-remove) -- MEDIUM confidence
-- [LogRocket: Background remover with Vue and Transformers.js](https://blog.logrocket.com/building-background-remover-vue-transformers-js/) -- MEDIUM confidence
-- [@imgly/background-removal npm](https://www.npmjs.com/package/@imgly/background-removal) -- HIGH confidence (evaluated, not recommended)
-- [RMBG-2.0 ONNX model sizes](https://huggingface.co/briaai/RMBG-2.0/tree/main/onnx) -- HIGH confidence
-- [Wes Bos bg-remover](https://github.com/wesbos/bg-remover) -- MEDIUM confidence (reference implementation)
+- Existing codebase analysis: `src/utils/canvas.ts`, `src/store/editorStore.ts`, `src/hooks/useRenderPipeline.ts`, `src/components/Canvas.tsx`, `src/components/BottomBar.tsx` [HIGH confidence -- primary source]
+- Canvas 2D `ctx.filter` supports `blur()` natively -- https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/filter [HIGH confidence]
+- CSS filter functions (`sepia`, `hue-rotate`, etc.) composable in `ctx.filter` string -- https://developer.mozilla.org/en-US/docs/Web/CSS/filter [HIGH confidence]
+- Unsharp mask / convolution kernel approach for sharpen is standard Canvas 2D pattern [HIGH confidence]
+- Percentage-based coordinate system proven by existing crop implementation in this codebase [HIGH confidence]
 
 ---
-*Architecture research for: in-browser AI background removal integration*
+*Architecture research for: WebImager v3.0 editing power features*
 *Researched: 2026-03-14*

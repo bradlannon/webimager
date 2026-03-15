@@ -1,238 +1,192 @@
 # Project Research Summary
 
-**Project:** WebImager v2.0 — AI Background Removal
-**Domain:** In-browser ML inference integrated into existing canvas-based image editor
+**Project:** WebImager v3.0 — Editing Power Features
+**Domain:** Browser-based image editor (Canvas 2D, client-side, zero-dependency extension)
 **Researched:** 2026-03-14
 **Confidence:** HIGH
 
 ## Executive Summary
 
-WebImager v2.0 adds client-side AI background removal to an existing non-destructive image editor. The research is unambiguous on the core approach: use `@huggingface/transformers` v3.x with the `briaai/RMBG-1.4` (uint8 quantized, ~45MB) model, running exclusively in a Web Worker, with the resulting alpha mask stored as an `ImageBitmap` in Zustand and composited into the existing `renderToCanvas()` pipeline via `globalCompositeOperation: 'destination-in'`. Only one new npm dependency is required. The existing stack (React 19, Vite 6, Zustand 5, Canvas 2D) handles everything else without modification.
+WebImager v3.0 adds four major feature areas — blur/sharpen filters, preset image filters, text overlay, and drawing/annotation — to an existing non-destructive Canvas 2D render pipeline. All four areas can be built without introducing any new npm dependencies. The existing `ctx.filter` CSS string pipeline handles blur and all preset filter effects; sharpen requires a standard 3x3 convolution kernel via `getImageData`/`putImageData`; text and drawing use the project's established "edit-until-applied" overlay pattern already proven by the crop feature. The architecture is an evolutionary extension of what exists, not a rewrite.
 
-The recommended approach is non-destructive by design: the mask is a render-time parameter, not baked into the source image. This means toggle on/off, rotation, flip, and crop all work correctly without re-running inference. WebImager's competitive angle — fully private, no account, no upload, integrated with editing tools — is genuine and not matched by any server-side competitor. The primary quality limitation (hair on complex backgrounds) is an accepted constraint shared by all free, in-browser tools.
+The recommended build order is dependency-driven: first refactor `renderToCanvas` to accept an options object (one-time change, avoids cascading signature churn), then add blur/sharpen (extends existing pipeline, introduces the pixel-manipulation code path, and forces resolution of the Safari `ctx.filter` gap), then preset filters (one new store field, establishes the new Filters tab pattern), then text overlay (introduces the HTML+canvas overlay pattern), and finally drawing/annotation (most complex, builds on every prior phase). Each phase delivers independent, shippable value.
 
-The key risks are all architectural and must be addressed in the first implementation phase: main-thread inference would freeze the UI for 5-30 seconds (non-negotiable: use a Web Worker from day one), JPEG export silently destroys transparency (must white-fill before encode), and mask misalignment with transforms (mask must be stored at source dimensions and transformed identically to the source at render time). All three risks are well-documented with clear prevention strategies. None require novel research — they just require discipline in execution.
+The most significant risk is the Safari `ctx.filter` gap — Safari has never shipped `CanvasRenderingContext2D.filter` enabled by default, meaning all existing adjustments (brightness, contrast, saturation) already silently fail on Safari. This must be resolved in Phase 1 because: (a) it affects the current app, not just v3.0, and (b) the fix benefits all filter features simultaneously. The second major risk is blur performance on large images — blur is O(n × r²) versus the O(n) cost of existing adjustments, requiring debouncing and/or preview-resolution rendering as part of the initial implementation.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The only new dependency is `@huggingface/transformers@^3.8.1`. This replaces the deprecated `@xenova/transformers` (v2) and is the official HuggingFace package. It bundles `onnxruntime-web` internally — do not install `onnxruntime-web` separately. Two Vite config changes are required: `optimizeDeps.exclude: ['@huggingface/transformers']` (prevents Vite from breaking WASM loading) and `worker.format: 'es'` (required for dynamic imports in the Web Worker).
-
-`@imgly/background-removal` was evaluated and rejected: AGPL license (viral, problematic for most projects), wraps the same ONNX models with less control, and offers no meaningful advantage. RMBG-2.0 was also evaluated and rejected: blocked by an `onnxruntime-web` bug, 366MB+ quantized model size, and "Unsupported model type" errors in Transformers.js as of March 2026.
+All v3.0 features are implementable with zero new dependencies. The existing stack — Canvas 2D API, `ctx.filter` CSS string syntax, Zustand 5.x, React 19, Vite 6, TypeScript 5.8, Tailwind CSS v4 — covers every requirement. See `.planning/research/STACK.md` for full details.
 
 **Core technologies:**
-- `@huggingface/transformers@^3.8.1`: ML inference runtime — only viable option with correct licensing and browser support
-- `briaai/RMBG-1.4` (uint8 quantized): segmentation model — ~45MB, browser-compatible, handles arbitrary subjects (people, products, animals, objects)
-- Web Worker (native browser API): inference isolation — mandatory to prevent main-thread freeze during 2-10 second inference
-- `ImageBitmap`: mask storage format — transferable, GPU-backed, closeable, consistent with existing sourceImage storage
-- `globalCompositeOperation: 'destination-in'`: mask compositing — correct Canvas 2D primitive, avoids premultiplied alpha bugs from putImageData
+- `ctx.filter` (CSS string syntax): Blur and preset filters — already used for brightness/contrast/saturation; append `blur(Npx)` and preset strings to existing `buildFilterString()`
+- SVG `feConvolveMatrix` via `ctx.filter = "url(#sharpen-N)"`: Sharpen — GPU-accelerated; pixel-loop fallback available if `url()` reference proves unreliable in Safari/Firefox
+- Canvas 2D drawing API (`fillText`, `beginPath`, `lineTo`, `arc`, `strokeRect`): Text rendering and annotation shapes — native primitives, no library
+- HTML `<div>` overlay (not canvas): Text editing UX — native cursor, selection, font rendering; converted to canvas pixels only on "Apply"
+- Zustand store extension: New slices for `blur`, `sharpen`, `activeFilter`, `textMode`/`pendingText`/`appliedTexts`, `drawMode`/`pendingPaths`/`appliedDrawingData`
+
+**Critical non-recommendation:** Do NOT use the object-based `new CanvasFilter()` API — it has no Safari support as of March 2026. The CSS string syntax (`ctx.filter = "blur(5px)"`) has Baseline 2024 support and is the correct choice.
 
 ### Expected Features
 
-The MVP (v2.0) is tightly scoped. Every table-stakes item has clear implementation direction from existing code. Differentiators are identified for v2.x follow-up.
+See `.planning/research/FEATURES.md` for the full feature matrix with complexity ratings and implementation notes.
 
-**Must have (v2.0 table stakes):**
-- One-click "Remove Background" button — single entry point, no configuration before first result
-- Progress indicator during model download and inference — prevents abandonment on first use (~45MB download, 2-10s inference)
-- Transparent background preview with checkerboard — `drawCheckerboard()` already exists in `canvas.ts`
-- Non-destructive mask with "Restore Background" toggle — source image preserved, mask is a render-time parameter
-- PNG export preserving alpha channel — existing PNG download pipeline; verify no alpha flattening in render path
-- JPEG export composited onto white background — must explicitly white-fill before encode; easy to miss, produces black background if omitted
+**Must have (table stakes) — P1:**
+- Gaussian blur slider (0-20px) — GPU-accelerated via `ctx.filter`, extends `buildFilterString()`
+- Sharpen slider (0-100 intensity) — convolution kernel, new pixel-manipulation code path
+- 8-10 preset filters (Sepia, Vintage, Warm, Cool, B&W, Fade, Vivid, Dramatic, Noir, Retro) — pure CSS filter string compositions
+- Text overlay with font size, color, and drag-to-position — HTML overlay, edit-until-applied
+- Freehand pen drawing with color and thickness controls — overlay canvas, smooth Bezier curves
+- Arrow, rectangle, circle, and line shape annotations — canvas primitives on overlay canvas
+- Edit-until-applied pattern for all overlays — matches existing crop UX
+- Per-stroke undo and clear-all for drawing — array pop, cheap to implement
 
-**Should have (v2.x differentiators):**
-- Solid color background replacement — highest-value differentiator, low effort; product photographers need white backgrounds specifically
-- Edge softness/feathering slider — Gaussian blur on alpha mask, no re-inference required; addresses "cut out with scissors" look
-- Before/after comparison toggle — low effort, good UX polish
-- Model caching verification across browsers — IndexedDB/Cache API persistence, cross-session validation
+**Should have (competitive) — P2:**
+- Smooth freehand via quadratic Bezier midpoint interpolation — ~20 lines of code, major visual quality improvement
+- Text font family selector (5-6 web-safe fonts) — CSS font strings, zero loading cost
 
-**Defer (v3+):**
-- Multiple model options (quality/speed tradeoff) — UI complexity for marginal gain
-- Background blur/portrait mode — different technique requiring depth estimation, needs separate research
-- WebGPU acceleration as explicit feature — browser support still maturing; Transformers.js auto-detects when available
-
-**Anti-features (explicitly excluded):**
-- Manual mask painting/brush tool — requires full brush engine, undo stack, layer system; scope explosion
-- Batch background removal — violates single-image workflow constraint
-- Server-side fallback for quality — violates client-side constraint; introduces backend, API keys, privacy concerns
+**Defer (v3.0+ / future):**
+- Preset filter strength slider — good differentiator, add after core presets ship
+- Preset filter preview thumbnails — polish feature; render at thumbnail size, cache per image
+- Full undo/redo history — PROJECT.md lists as future candidate
+- Layer system, rich text, custom filter matrix, Bezier pen tool — anti-features; out of scope by design
 
 ### Architecture Approach
 
-The mask integrates as an optional fourth parameter to `renderToCanvas()`. The pipeline order is: source image → rotation/flip transforms → crop extraction → alpha mask compositing (NEW) → `ctx.filter` adjustments. This order is mandatory: mask must come after transforms/crop (so coordinates align) and before `ctx.filter` (which must operate on opaque pixels to avoid premultiplied alpha color fringing). When both mask and adjustments are active, a second canvas copy-and-redraw pass is required. The Web Worker holds the loaded model in memory between calls, sends pixel data via transferable `ArrayBuffer` (zero-copy), and returns a single-channel mask that the main thread converts to an RGBA `ImageBitmap`.
+The v3.0 architecture extends the existing `renderToCanvas` pipeline with three additions: (1) blur/sharpen fields in `Adjustments` and a new sharpen convolution render step, (2) an `activeFilter` store field that composes preset CSS filter strings with manual adjustment strings in `buildFilterString()`, and (3) an overlay layer pattern for text and drawing where editable content lives outside the main pipeline and is composited into the output after all base-image processing. Applied text (`appliedTexts: TextOverlay[]`) and applied drawing (`appliedDrawingData: ImageData | null`) render at the end of every pipeline pass — keeping them visually above filters and masks without baking into `sourceImage`. See `.planning/research/ARCHITECTURE.md` for the full component tree, store shape, and per-file change lists.
 
-**Major components:**
-1. `src/workers/bgRemovalWorker.ts` (NEW) — Transformers.js model loading, inference, progress reporting; model cached in worker memory after first load
-2. `src/hooks/useBgRemoval.ts` (NEW) — worker lifecycle management, store updates, pixel data extraction from sourceImage
-3. `src/utils/canvas.ts` (MODIFIED) — `renderToCanvas()` gains `alphaMask?` parameter; compositing via `destination-in`; second-pass filter handling when mask active
-4. `src/store/editorStore.ts` (MODIFIED) — new `backgroundRemoval` state slice: `{ enabled, mask, status, progress, error }`
-5. `src/components/BackgroundRemovalControls.tsx` (NEW) — remove button, progress bar, restore button, status display
-6. `src/utils/download.ts` (MINOR CHANGE) — white-fill before JPEG encode when mask active
+**Updated render pipeline order (9 steps):**
+1. Apply transforms (rotate, flip) — existing
+2. Apply crop — existing
+3. Apply `ctx.filter` string (adjustments + `activeFilter` preset) — modified
+4. Draw image to canvas — existing
+5. Apply sharpen convolution — new
+6. Apply background mask (destination-in) — existing
+7. Fill replacement color (destination-over) — existing
+8. Render applied texts (`ctx.fillText`) — new
+9. Composite applied drawing data — new
+
+**Major new components:**
+1. `src/utils/sharpen.ts` — convolution kernel function (`applySharpen`)
+2. `src/types/filters.ts` + `src/components/FilterControls.tsx` — preset data and selection UI
+3. `src/types/text.ts` + `src/components/TextOverlayElement.tsx` + `src/components/TextControls.tsx` — text overlay system
+4. `src/types/drawing.ts` + `src/components/DrawingOverlay.tsx` + `src/components/DrawControls.tsx` — drawing overlay system
+
+**First action before any feature work:** Refactor `renderToCanvas` from 7 positional parameters to an options object. One-time change; prevents four rounds of cascading signature churn.
 
 ### Critical Pitfalls
 
-1. **Main-thread inference freezes UI 5-30 seconds** — Non-negotiable: ALL model loading and inference must run in a Web Worker. `await` on WASM execution is not non-blocking on the main thread. Design the Worker first; retrofitting is a near-total rewrite of the integration layer.
+See `.planning/research/PITFALLS.md` for all 8 pitfalls, integration gotchas, performance traps, and the full "Looks Done But Isn't" verification checklist.
 
-2. **JPEG export silently destroys transparency** — The existing DownloadPanel defaults to JPEG. When background removal is active, auto-switch to PNG and/or white-fill before JPEG encode. Add `hasTransparency` awareness to the store. Missing this is the most common user-visible bug.
+1. **Safari `ctx.filter` silently does nothing** — `CanvasRenderingContext2D.filter` is disabled by default in all Safari versions through Safari 26.4 (WebKit Bug #198416, open since 2019). ALL existing adjustments currently fail silently on Safari. Resolve in Phase 1 via runtime feature detection + polyfill (`context-filter-polyfill`) or manual `getImageData` fallback. Do not add more `ctx.filter` usage before choosing the Safari strategy.
 
-3. **Mask misalignment after rotation/flip/crop** — The mask is generated from the source image at its original orientation. It must be drawn with identical transforms applied. Store mask at source dimensions; apply same rotation/flip/crop transforms to mask at render time. Do not apply mask as a post-pipeline step to the final rendered output.
+2. **Blur performance freezes on large images** — Blur is O(n × r²); dragging the slider on a 4000×3000 image causes 500ms–2s freezes per tick. Must debounce (150–200ms) and/or render preview at 1/4 resolution during drag. This is part of the initial blur implementation, not a follow-up.
 
-4. **Canvas premultiplied alpha causes edge fringing** — `ctx.filter` (brightness/contrast) applied to semi-transparent pixels produces color shifts at edges. Apply `ctx.filter` to the opaque source first, then composite the alpha mask. Use `globalCompositeOperation: 'destination-in'`, not `putImageData`, for mask application.
+3. **Drawing strokes disappear on pipeline re-render** — The render pipeline clears the canvas on every render. Drawing directly to the main canvas is fundamentally broken with this architecture. A separate overlay `<canvas>` must hold pending strokes; they composite into the pipeline output only on "Apply."
 
-5. **Memory exhaustion on large images** — Source + mask + temp canvas + model weights (~45MB) can reach 400MB+ on a 4000x3000 image, crashing mobile Safari. Call `ImageBitmap.close()` on intermediate bitmaps, downscale input to the model's native resolution (~1024px), release temporary canvases with `canvas.width = 0`.
+4. **Coordinate misalignment with zoom and pan** — Screen pointer coordinates must be un-transformed through CSS display scaling, zoom level, and pan offset to map correctly to image space. A `screenToCanvas()` utility must be built and tested at multiple zoom levels before any pointer-based drawing or text drag feature works.
+
+5. **Preset filters must be separate from manual adjustments** — Implementing presets via `setAdjustment()` calls destroys the user's manual settings. Store `activeFilter: string | null` independently. Compose filter strings as preset + adjustments in `buildFilterString()`. Users can tweak a preset and remove it without losing their manual values.
 
 ## Implications for Roadmap
 
-### Phase 1: Worker Infrastructure and Model Integration
+Research points clearly to a four-phase structure following a mandatory Step 0 refactor. All phases are independent of each other in that each delivers shippable value, but they must be built in the stated order due to architectural dependencies.
 
-**Rationale:** Everything else depends on the Web Worker and model pipeline being correct. The architectural decisions made here — worker message protocol, model caching, progress reporting — are load-bearing for all subsequent phases. Retrofitting a worker around a main-thread implementation is effectively a rewrite of the integration layer.
+### Step 0: Refactor `renderToCanvas` Signature
+**Rationale:** Every subsequent phase adds parameters to this function. Refactoring to an options object now avoids four rounds of signature changes and cascading call-site updates across `useRenderPipeline`, `downloadImage`, and `applyResize`. One PR, zero risk if done before any feature code.
+**Delivers:** Clean options-based `RenderOptions` interface; all existing call sites updated once.
+**Avoids:** Cascading churn across all four feature phases.
 
-**Delivers:** Working background removal in isolation (no UI polish, no edge cases handled). Proves the inference pipeline end-to-end: click → worker → model inference → mask returned → mask stored.
+### Phase 1: Blur, Sharpen, and Safari Compatibility
+**Rationale:** Extends the existing pipeline with minimal architectural change. Establishes the pixel-manipulation code path (sharpen convolution). Forces the Safari `ctx.filter` decision now — a fix that benefits all existing adjustments, not just v3.0 blur. Blur performance debouncing is part of the initial implementation. Lowest risk, foundational.
+**Delivers:** Blur slider, sharpen slider, Safari-safe filter rendering for all adjustments.
+**Addresses:** Blur (table stakes), sharpen (table stakes), blur performance, Safari compatibility.
+**Avoids:** Safari `ctx.filter` failure (Pitfall 1), blur performance freeze (Pitfall 6), sharpen-as-CSS-filter mistake (Pitfall 2), blur bleed into background mask edges (integration gotcha).
+**Research flag:** Low — blur/sharpen patterns are well-documented. One open question: whether SVG `feConvolveMatrix` via `url()` is reliable enough in Safari/Firefox for the sharpen path. Test both SVG and `getImageData` approaches during implementation; choose based on results.
 
-**Addresses:** One-click removal, progress indicator, ML model loading and caching
+### Phase 2: Preset Filters
+**Rationale:** Depends on the updated `buildFilterString` from Phase 1. Introduces one new store field (`activeFilter`) and one new BottomBar tab, establishing the tab-addition pattern for Phases 3 and 4. No overlay or mode complexity. All preset effects are pure CSS filter string compositions — zero pixel manipulation.
+**Delivers:** 8-10 named filter presets with visual selection UI; preset/adjustment interaction model (independent, composing).
+**Addresses:** Preset filters (table stakes), preset/adjustment independence requirement.
+**Avoids:** Preset-overwrites-adjustments conflict (Pitfall 5), greyscale/preset CSS filter ordering bug (integration gotcha).
+**Research flag:** None needed — CSS filter string composition is fully documented and proven.
 
-**Avoids:** Main-thread blocking (Pitfall 2), model download UX failure (Pitfall 3), WebGPU/WASM backend detection failure (Pitfall 7)
+### Phase 3: Text Overlay
+**Rationale:** Introduces the edit-until-applied overlay pattern for non-crop features. Uses an HTML `<div>` overlay during editing (native text input UX) and `ctx.fillText` on apply. Simpler than drawing: no real-time stroke rendering, no multi-tool management. Validates the "applied overlays composited at render time" architecture before drawing depends on it. Establishes the `screenToCanvas` coordinate utility that drawing will reuse.
+**Delivers:** Text overlay with drag-to-position, font/size/color controls, bold/italic, edit-until-applied workflow, baked-in on apply.
+**Addresses:** Text overlay (table stakes), drag-to-position (table stakes).
+**Avoids:** Canvas-only text that cannot be edited after placement (Pitfall 8), pixel-coordinate storage that breaks on zoom/resize (Pitfall 4).
+**Research flag:** Low — HTML overlay + `ctx.fillText` pattern is well-understood. Main implementation validation: font rendering parity between HTML preview and canvas apply output; test with multiple fonts and small sizes.
 
-**Implementation order within phase:**
-1. `npm install @huggingface/transformers` + Vite config changes (`optimizeDeps.exclude`, `worker.format: 'es'`)
-2. `BackgroundRemoval` interface in `types/editor.ts`
-3. `backgroundRemoval` state slice in `editorStore.ts`
-4. `bgRemovalWorker.ts` with model loading, inference, progress messages, WASM backend default
-5. `useBgRemoval.ts` hook with worker lifecycle management
-
-**Research flag:** Standard patterns — well-documented Transformers.js Worker integration with reference implementations from Addy Osmani and Wes Bos. No additional phase research needed.
-
----
-
-### Phase 2: Canvas Pipeline Integration
-
-**Rationale:** Mask compositing must be correct before any UI is built on top of it. Getting the render pipeline order wrong (mask before transforms, or after `ctx.filter`) causes visual bugs that are hard to diagnose once UI is layered on top.
-
-**Delivers:** Correct transparent canvas rendering with mask applied through all transform/crop combinations. The "Looks Done But Isn't" checklist items for rotation, crop, and adjustments all pass.
-
-**Addresses:** Transparent background preview, non-destructive mask toggle, alpha channel preservation in the full render pipeline
-
-**Avoids:** Mask/pipeline misalignment (Pitfall 4), canvas premultiplied alpha fringing (Pitfall 5), memory exhaustion (Pitfall 6)
-
-**Critical verification steps (from PITFALLS.md checklist):**
-- Remove background → rotate 90 → verify mask aligned correctly
-- Remove background → crop → verify transparent areas remain correct
-- Remove background → adjust brightness → verify no color fringing at mask edges
-- Remove background → resize → verify alpha preserved in new ImageBitmap
-- Run on a 4000x3000 image on iOS Safari → verify no tab crash
-
-**Research flag:** Standard Canvas 2D compositing patterns. MDN documentation is authoritative. No additional research needed.
-
----
-
-### Phase 3: Export Handling
-
-**Rationale:** Export correctness must be addressed before the feature ships to users. The existing DownloadPanel defaults to JPEG, which silently destroys transparency — the highest-probability user-visible bug. Isolating this as its own phase ensures it gets explicit attention before UI polish begins.
-
-**Delivers:** Correct download behavior for both PNG (alpha preserved) and JPEG (white-filled). Format selector updated with transparency awareness. Users warned or auto-redirected when selecting JPEG with an active mask.
-
-**Addresses:** JPEG export behavior, PNG export alpha preservation, format selector intelligence
-
-**Avoids:** JPEG transparency loss (Pitfall 1) — transparent areas producing black background on download
-
-**Implementation within phase:**
-- `download.ts`: detect `backgroundRemoval.enabled`, white-fill before JPEG encode
-- `DownloadPanel`: auto-switch to PNG when background removed, show JPEG warning if user overrides
-- Verification: download background-removed image as JPEG → confirm white background, not black
-
-**Research flag:** Well-understood JPEG alpha behavior. No additional research needed.
-
----
-
-### Phase 4: UI and UX Polish
-
-**Rationale:** With correct functionality proven in Phases 1-3, UI can be built confidently without architectural surprises. Building UI before the pipeline is correct leads to throwaway rework.
-
-**Delivers:** `BackgroundRemovalControls` component, progress bar with MB indication, Restore Background button, sidebar integration, model size disclosure on first use
-
-**Addresses:** All v2.0 table-stakes UX requirements — complete the feature for launch
-
-**Avoids:** UX pitfalls from PITFALLS.md: no progress during download, no undo, no completion confirmation, no transparency-aware format guidance
-
-**Research flag:** Standard React component patterns. No additional research needed.
-
----
-
-### Phase 5: Differentiators (v2.x)
-
-**Rationale:** Delivers competitive advantages after the core feature is stable and validated with real users.
-
-**Delivers:** Solid color background replacement (highest priority), edge softness/feathering slider, before/after comparison toggle
-
-**Addresses:** All "Should have" features from FEATURES.md
-
-**Implementation notes:**
-- Color replacement: composite subject over a filled rectangle; color picker with white/black/grey presets plus custom
-- Edge feathering: Gaussian blur on alpha mask before `destination-in` compositing; no re-inference, pure post-processing
-- Before/after toggle: conditional mask parameter in `renderToCanvas()` call — already built into the render pipeline
-
-**Research flag:** Standard patterns. No additional research needed.
-
----
+### Phase 4: Drawing and Annotation
+**Rationale:** Most complex feature. Depends on the overlay canvas pattern (a second `<canvas>` element, not HTML), the `screenToCanvas` utility from Phase 3, and the `exitAllModes()` mode-exclusivity helper validated in Phase 3. Multiple tools (pen, arrow, rect, circle, line) share infrastructure. Per-stroke undo via array pop is built into the design.
+**Delivers:** Freehand pen (quadratic Bezier-smoothed), arrow, rectangle, circle, and line annotations; color/thickness controls; per-stroke undo; clear-all; edit-until-applied with overlay canvas.
+**Addresses:** All annotation tools (table stakes), smooth freehand (P2 differentiator).
+**Avoids:** Drawing to main canvas causing strokes to vanish on re-render (Pitfall 7), coordinate misalignment (Pitfall 4 — solved by Phase 3 utility), drawing/pan pointer conflict (mode-exclusivity gotcha).
+**Research flag:** Low — pen, shapes, and arrowhead trigonometry are standard patterns with no ambiguity. Main effort is implementation volume, not research.
 
 ### Phase Ordering Rationale
 
-- **Worker before canvas pipeline:** The worker message protocol determines what data the canvas pipeline receives. Designing the pipeline before the worker means refactoring the worker API to match pipeline requirements discovered later.
-- **Canvas pipeline before UI:** UI components bind to store state and the pipeline's data shapes. Building UI first causes frequent API churn as the pipeline evolves.
-- **Export before polish:** A feature that silently corrupts downloads is a correctness bug, not a polish gap. Export correctness ships with the feature, not after.
-- **Differentiators last:** All differentiators (color replacement, feathering, before/after toggle) are additive operations that depend on having a correct alpha mask. None affect the core pipeline.
+- **Step 0 before everything:** Signature refactor is a pure enabler. Easier before new parameters exist than after.
+- **Filters before overlays:** Blur/sharpen and presets are independent of the overlay pattern. Building them first validates pipeline extension before introducing overlay complexity.
+- **Phase 1 before Phase 2:** `buildFilterString` changes in Phase 1 are a prerequisite for preset filter string composition in Phase 2.
+- **Text before drawing:** Text validates "composited at render time" with simpler state (one object vs. array of paths). It also establishes the `screenToCanvas` utility drawing needs. Text mistakes are cheaper to learn from.
+- **Drawing last:** Highest complexity, most failure modes, requires every prior pattern to be in place.
 
 ### Research Flags
 
-Needs `/gsd:research-phase` during planning:
-- **None identified.** All phases use well-documented browser APIs and Transformers.js patterns. Reference implementations exist and have HIGH-confidence sources.
+Phases likely needing deeper research during planning:
+- **Phase 1 (blur/sharpen):** Two open questions need resolution during implementation: (a) whether SVG `feConvolveMatrix` via `ctx.filter = "url(#id)"` is reliable in Safari and Firefox (have the `getImageData` fallback ready), and (b) which Safari strategy to adopt — polyfill (`context-filter-polyfill`) vs. manual `getImageData` fallback vs. scoped support declaration. Test on actual Safari before writing Phase 1 implementation code.
 
-Standard patterns (research-phase not needed):
-- **Phase 1:** Transformers.js Web Worker integration is documented with working reference implementations (Addy Osmani, Wes Bos, LogRocket)
-- **Phase 2:** Canvas 2D `globalCompositeOperation` is authoritative MDN-documented behavior
-- **Phase 3:** JPEG alpha flattening is a known browser behavior with a standard white-fill solution
-- **Phase 4:** React progress/loading component patterns are standard
-- **Phase 5:** Gaussian blur on ImageData and canvas color fill are basic Canvas 2D operations
+Phases with standard patterns (research-phase not needed):
+- **Step 0:** Mechanical refactor, no ambiguity.
+- **Phase 2:** Pure CSS filter string composition. Fully documented by MDN.
+- **Phase 3:** HTML overlay + `ctx.fillText`. Established pattern in this codebase already (see CropOverlay).
+- **Phase 4:** Overlay canvas + pointer events + basic trigonometry. Well-documented; effort is implementation volume, not research.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Single recommended library with clear rationale; alternatives explicitly evaluated and rejected with documented reasons (GitHub issues, npm audits, license review) |
-| Features | HIGH | Table stakes established from competitor analysis (remove.bg, Photoroom, Canva); differentiators are concrete and implementation-defined with cost/value estimates |
-| Architecture | HIGH | Existing codebase architecture well-understood; pipeline integration points are specified to the function-signature level with code examples |
-| Pitfalls | HIGH | Pitfalls sourced from GitHub issues, production post-mortems, and reference implementations; all have concrete prevention strategies and recovery cost estimates |
+| Stack | HIGH | All choices rely on MDN-documented native browser APIs and already-installed packages. Zero new dependencies means zero version risk. The SVG `feConvolveMatrix` sharpen path is the only unvalidated approach; a `getImageData` fallback exists and is equally well-documented. |
+| Features | HIGH | Scope is tightly bounded by PROJECT.md constraints. Table-stakes features are consistent across research and competitor analysis. Anti-features are well-reasoned against architecture constraints. |
+| Architecture | HIGH | Research is grounded in the actual codebase (real file names, function signatures, store shape). All patterns extend proven patterns already present in the project (edit-until-apply from crop, overlay positioning from CropOverlay, percentage coordinates from crop). |
+| Pitfalls | HIGH | Safari `ctx.filter` gap confirmed by Can I Use data and WebKit bug tracker. Performance characteristics confirmed by browser bug reports. Coordinate transform requirements confirmed by existing crop implementation. |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **RMBG-1.4 licensing for commercial use:** The model uses a Creative Commons non-commercial license. Acceptable for a free static site. If WebImager ever monetizes, the model must be replaced with `Xenova/modnet` (MIT) or a commercially-licensed alternative. Flag this if commercialization is ever on the roadmap.
-
-- **Mobile inference performance on mid-range Android:** Research characterizes WASM inference as 5-30 seconds. Actual performance on mid-range Android (not just desktop or iOS) is not precisely characterized. The progress bar and patience messaging are essential safeguards. Validate during Phase 1 testing on real devices.
-
-- **Browser Cache API eviction for model caching:** Transformers.js uses the Cache API, which is subject to browser eviction under storage pressure. Research confirms caching works but does not quantify eviction likelihood in practice. Consider surfacing a "model downloaded" indicator so users understand why an occasional re-download occurs.
-
-- **`applyResize` alpha preservation:** PITFALLS.md flags that `applyResize` creates a new `ImageBitmap` which may flatten alpha. The mask invalidation rules (resize clears mask) contain this risk, but the actual `applyResize` implementation should be verified during Phase 2 to confirm it does not silently produce an opaque ImageBitmap.
+- **Safari `ctx.filter` baseline (confirm before Phase 1):** Test the current app on Safari immediately to confirm whether existing brightness/contrast/saturation sliders already fail. If they do, this is a pre-existing bug that blocks all filter work on iOS. The resolution (polyfill vs. `getImageData` fallback) must be decided before Phase 1 work begins.
+- **SVG filter `url()` reliability in Firefox and Safari:** The recommended sharpen approach uses `ctx.filter = "url(#sharpen-N)"`. Validate with a quick prototype before committing to it. `getImageData` pixel convolution is the trivially available fallback.
+- **Bottom bar tab count on mobile:** Adding 3 tabs (Filters, Text, Draw) to the existing 6 creates 9 icon-only tabs at ~35px each = 315px on a 320px screen. Test on actual mobile hardware before finalizing tab layout. Fallback: merge Filters into the Adjustments tab as a sub-section, keeping new standalone tabs to 2.
+- **Font rendering parity (HTML vs. canvas):** The text overlay shows an HTML `<div>` during editing and switches to `ctx.fillText` on apply. Minor differences in kerning and anti-aliasing are expected and acceptable; validate during Phase 3 that they do not produce a jarring visual shift, particularly at small font sizes.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- [@huggingface/transformers on npm](https://www.npmjs.com/package/@huggingface/transformers) — v3.8.1, library API reference
-- [Transformers.js v3 announcement](https://huggingface.co/blog/transformersjs-v3) — WebGPU support, `@huggingface/transformers` package name
-- [RMBG-1.4 Model Card](https://huggingface.co/briaai/RMBG-1.4) — model capabilities, quantization options, license
-- [RMBG-2.0 onnxruntime-web bug](https://github.com/microsoft/onnxruntime/issues/21968) — why RMBG-2.0 is not viable in-browser
-- [RMBG-2.0 Transformers.js issue](https://github.com/huggingface/transformers.js/issues/1107) — "Unsupported model type" error documentation
-- [Canvas globalCompositeOperation MDN](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/globalCompositeOperation) — compositing operation behavior
-- [Optimizing Transformers.js for Production - SitePoint](https://www.sitepoint.com/optimizing-transformers-js-production/) — Vite config patterns, `optimizeDeps.exclude` requirement
+- [MDN: CanvasRenderingContext2D.filter](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/filter) — `ctx.filter` CSS string support, blur syntax, Baseline 2024 status
+- [MDN: fillText / TextMetrics](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/fillText) — canvas text rendering and bounding box measurement
+- [MDN: feConvolveMatrix](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Element/feConvolveMatrix) — SVG convolution filter for sharpening
+- [MDN: Pixel manipulation with canvas](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Pixel_manipulation_with_canvas) — ImageData, getImageData, putImageData
+- [MDN: Drawing shapes with canvas](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Drawing_shapes) — path, arc, rect, shape drawing reference
+- [MDN: CSS filter functions](https://developer.mozilla.org/en-US/docs/Web/CSS/filter) — sepia, hue-rotate, and other preset filter functions
+- [Can I Use: CanvasRenderingContext2D.filter](https://caniuse.com/mdn-api_canvasrenderingcontext2d_filter) — Safari support status: disabled by default through Safari 26.4
+- [WebKit Bug #198416](https://bugs.webkit.org/show_bug.cgi?id=198416) — ctx.filter disabled in Safari, open since 2019
+- Existing codebase (`src/utils/canvas.ts`, `src/store/editorStore.ts`, `src/hooks/useRenderPipeline.ts`, `src/components/Canvas.tsx`, `src/components/BottomBar.tsx`) — primary architectural source
 
 ### Secondary (MEDIUM confidence)
-- [Addy Osmani's bg-remove](https://github.com/addyosmani/bg-remove) — React + Transformers.js reference implementation
-- [Wes Bos bg-remover](https://github.com/wesbos/bg-remover) — additional reference implementation
-- [LogRocket: Background remover with Vue and Transformers.js](https://blog.logrocket.com/building-background-remover-vue-transformers-js/) — Worker architecture patterns
-- [Canvas premultiplied alpha - DEV Community](https://dev.to/yoya/canvas-getimagedata-premultiplied-alpha-150b) — alpha fringing cause and explanation
-- [ONNX Runtime Web WASM memory limits](https://github.com/microsoft/onnxruntime/issues/10957) — memory exhaustion characterization on mobile
-- [BRIA RMBG-2.0 benchmarks](https://blog.bria.ai/benchmarking-blog/brias-new-state-of-the-art-remove-background-2.0-outperforms-the-competition) — 90% vs 74% accuracy comparison (quantifying RMBG-1.4 quality tradeoff)
-- [IMG.LY: 20x Faster Browser Background Removal with ONNX Runtime](https://img.ly/blog/browser-background-removal-using-onnx-runtime-webgpu/) — WebGPU performance benchmarks, competitor feature context
+- [web.dev: Image filters with canvas](https://web.dev/canvas-imagefilters/) — convolution kernel patterns, sharpen kernel values `[0,-1,0,-1,5,-1,0,-1,0]`
+- [IMG.LY: How to apply filters in JavaScript](https://img.ly/blog/how-to-apply-filters-in-javascript/) — CSS filter composition techniques
+- [Viget: Instagram-style filters in HTML5 Canvas](https://www.viget.com/articles/instagram-style-filters-in-html5-canvas) — preset filter CSS recipes
+- [Coding Dude: CSS Image Effects for Vintage Photos](https://www.coding-dude.com/wp/css/css-image-effects/) — warm/cool/vintage filter CSS recipes
+- [Envato Tuts+: Canvas Drawing Tool with Vanilla JavaScript](https://webdesign.tutsplus.com/how-to-create-a-canvas-drawing-tool-with-vanilla-javascript--cms-108856t) — freehand drawing implementation patterns
+- [Mozilla Bug #1498291](https://bugzilla.mozilla.org/show_bug.cgi?id=1498291) — CSS blur effects performance characterization
+
+### Tertiary (LOW confidence)
+- [GitHub Gist: mikecao sharpen function](https://gist.github.com/mikecao/65d9fc92dc7197cb8a7c) — reference pixel-level sharpen kernel implementation; math is standard, source is community
+- [context-filter-polyfill (GitHub: davidenke)](https://github.com/davidenke/context-filter-polyfill) — potential Safari `ctx.filter` polyfill; needs evaluation before adoption
 
 ---
 *Research completed: 2026-03-14*

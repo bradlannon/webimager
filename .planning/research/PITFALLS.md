@@ -1,191 +1,229 @@
 # Pitfalls Research
 
-**Domain:** In-browser AI background removal added to existing canvas-based image editor
+**Domain:** Adding blur/sharpen filters, preset image filters, text overlay, and drawing/annotation to an existing Canvas 2D image editor with non-destructive render pipeline
 **Researched:** 2026-03-14
 **Confidence:** HIGH
 
 ## Critical Pitfalls
 
-### Pitfall 1: JPEG Export Destroys Transparency (Black/White Background Instead of Transparent)
+### Pitfall 1: ctx.filter Does Not Work on Safari -- Blur and Existing Adjustments Are Silently Broken
 
 **What goes wrong:**
-After removing the background, the canvas contains pixels with alpha=0 (transparent). The user downloads as JPEG -- which does not support alpha channels -- and gets a black or white background instead of the transparent result they expected. The current DownloadPanel defaults to JPEG format, so this will bite most users immediately.
+The project uses `ctx.filter = buildFilterString(adjustments)` for brightness, contrast, saturation, and greyscale. Adding blur via `ctx.filter = 'blur(5px)'` follows the same pattern. However, `CanvasRenderingContext2D.filter` is disabled by default in Safari (all versions through Safari 26.4 as of March 2026). This means ALL existing adjustment features (brightness, contrast, saturation, greyscale) and any new blur filter silently do nothing on Safari. The image renders without any adjustments applied.
 
 **Why it happens:**
-The existing download pipeline (`downloadImage` in `utils/download.ts`) passes the format directly to `canvas.toBlob()`. JPEG encoding flattens alpha to opaque, and browsers fill transparent regions with black by default. The current code has no awareness of whether the image contains transparency.
+The `ctx.filter` property has 80.94% global browser support (Chrome 52+, Firefox 49+, Edge 79+) but Safari has never shipped it enabled by default. WebKit bug #198416 tracks this. The existing v1.0/v2.0 decision to use `ctx.filter` was noted as "GPU-accelerated, no pixel manipulation needed" but the Safari gap was not flagged. Developers testing on Chrome never notice the issue.
 
 **How to avoid:**
-- When background removal is active, auto-switch the download format to PNG and disable or warn on JPEG selection
-- If the user insists on JPEG, composite the transparent image onto a white canvas before encoding (`ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h)` before `drawImage`)
-- Add a `hasTransparency` flag to the editor store that tracks whether background removal has been applied
-- Update the DownloadPanel to show a warning: "JPEG does not support transparency. Transparent areas will appear white."
+- **Option A (recommended):** Detect `ctx.filter` support at runtime. If unsupported, fall back to manual pixel manipulation via `getImageData`/`putImageData` for adjustments and blur. This is slower but universal.
+- **Option B:** Use the `context-filter-polyfill` library (GitHub: davidenke/context-filter-polyfill) which polyfills `ctx.filter` for Safari using `getImageData` internally.
+- **Option C:** Accept Safari limitation and document it. This is the path of least resistance but means ~18% of desktop users and nearly all iOS users get no adjustments at all.
+- For v3.0, if adding blur via `ctx.filter`, the Safari issue compounds -- now users lose blur AND all existing adjustments.
+- Test the existing app on Safari right now to confirm whether adjustments already fail.
 
 **Warning signs:**
-- DownloadPanel defaults to JPEG with no format intelligence
-- No store state tracking whether the image has transparency
-- No pre-fill of white background before JPEG export
-- Users reporting "black background" on downloaded images
+- No browser detection or feature detection for `ctx.filter` in the codebase
+- No polyfill or fallback path in `buildFilterString` or `renderToCanvas`
+- All testing done on Chrome/Firefox only
+- No Safari-specific test cases in the test suite
+- Users on Safari/iOS reporting "adjustments do nothing"
 
 **Phase to address:**
-Export/download integration phase. Must be implemented alongside or immediately after the background removal feature, not deferred.
+Blur/sharpen phase. Before adding blur via `ctx.filter`, decide on the Safari strategy. If choosing to polyfill or implement manual fallback, the fix benefits blur AND all existing adjustments simultaneously.
 
 ---
 
-### Pitfall 2: ML Inference Blocks the Main Thread, Freezing the UI for 5-30 Seconds
+### Pitfall 2: Sharpen Has No ctx.filter Equivalent -- Requires Manual Pixel Convolution
 
 **What goes wrong:**
-Running the segmentation model (RMBG-1.4 or similar, ~40M parameters) on the main thread freezes the entire browser tab. The user clicks "Remove Background," the UI becomes completely unresponsive for 5-30 seconds depending on image size and device. No spinner, no progress, no cancel. On mobile, the browser may show "Page Unresponsive" and offer to kill the tab.
+Developers assume `ctx.filter = 'sharpen(1)'` exists analogously to `blur()`. It does not. The CSS/Canvas filter API provides `blur()`, `brightness()`, `contrast()`, `saturate()`, `grayscale()`, `sepia()`, `hue-rotate()`, `invert()`, `opacity()`, and `drop-shadow()`. There is no `sharpen()` filter. Sharpen requires manual convolution kernel processing via `getImageData`/`putImageData`.
 
 **Why it happens:**
-The simplest Transformers.js integration runs `pipeline('image-segmentation', model)` directly in the component or an async function. While the model inference is technically asynchronous at the ONNX level, the WASM execution still heavily blocks the main thread. Developers see `await` and assume it is non-blocking -- it is not.
+Blur is a standard CSS filter function. Developers see blur in the filter API and assume sharpen is its complement. It is not -- sharpen is a convolution operation that requires reading and writing individual pixels. The newer `CanvasFilter` API has `convolveMatrix` which could theoretically do this, but it has even worse browser support than `ctx.filter`.
 
 **How to avoid:**
-- Run ALL model loading and inference inside a dedicated Web Worker
-- Use `postMessage` with transferable objects (`ImageData.data.buffer`) to avoid copying pixel data between threads
-- Set `env.backends.onnx.wasm.proxy = true` in Transformers.js to proxy WASM execution to a worker thread automatically
-- Show an immediate loading state with a progress indicator before inference starts
-- Consider a cancel mechanism (terminate the worker and spawn a new one)
+- Implement sharpen as a convolution kernel: `[0, -1, 0, -1, 5, -1, 0, -1, 0]` (standard 3x3 sharpen kernel)
+- Use `getImageData` to read pixels, apply the convolution, `putImageData` to write the result
+- This is a fundamentally different code path from `ctx.filter`-based adjustments -- plan the architecture accordingly
+- Since sharpen already requires `getImageData`/`putImageData`, consider whether blur should also use manual convolution for consistency and Safari compatibility (see Pitfall 1)
+- Keep the source/result buffers separate -- convolution cannot be done in-place (reading pixels you have already modified produces incorrect results)
 
 **Warning signs:**
-- No Web Worker file in the project
-- Model inference called directly in React components or Zustand actions
-- No loading/progress UI for background removal
-- `env.backends.onnx.wasm.proxy` not set to `true`
+- Code tries to use `ctx.filter = 'sharpen(...)'` (will silently produce "none" filter)
+- Sharpen implementation modifies pixel buffer in-place during convolution (causes smearing)
+- No separate input/output buffer in the convolution code
+- Performance is not tested on large images (convolution on a 4000x3000 image = 36M pixel operations per kernel element)
 
 **Phase to address:**
-Core architecture phase -- the worker infrastructure must be designed before integrating the model. Retrofitting a worker around a main-thread implementation is a near-total rewrite of the integration code.
+Blur/sharpen phase. Sharpen must be architecturally designed before implementation because it introduces a new rendering approach (pixel manipulation) that the current pipeline does not use.
 
 ---
 
-### Pitfall 3: Model Download is 30-90MB and Has No Progress Feedback or Caching Strategy
+### Pitfall 3: Freehand Drawing and Text Cannot Be Non-Destructive Parameters Like Existing Edits
 
 **What goes wrong:**
-The ONNX model file for background removal is typically 30-90MB (RMBG-1.4 quantized is ~30MB, full precision ~90MB). On first use, this downloads with no progress indication. The user clicks "Remove Background," waits 10-45 seconds with no feedback, thinks the app is broken, and closes the tab -- aborting the download. On subsequent visits, the model may re-download if caching is not configured.
+The existing pipeline renders everything from parameters: source image + transforms + adjustments + crop + mask = rendered output. Every render is a fresh pass from the source. Freehand drawing strokes and text overlays are spatial data (pixel positions, paths, strings with positions) that cannot be expressed as simple numeric parameters. Developers try to force them into the existing `renderToCanvas` function, making it impossibly complex, or they render directly to the display canvas and lose the drawing when the next render pass clears it.
 
 **Why it happens:**
-Transformers.js uses the browser Cache API internally, but developers do not realize: (1) the initial download needs explicit progress feedback, (2) the cache can be evicted by the browser under storage pressure, and (3) the model must be served with correct `Cache-Control` headers if self-hosted.
+The non-destructive pipeline works by clearing the canvas and re-rendering from source on every state change. This is correct for transforms and adjustments. But drawing strokes are additive content -- they are layered ON TOP of the rendered image. If you re-render the image, the strokes are gone. If you bake the strokes into the source image, they become destructive (cannot be moved/edited/removed).
 
 **How to avoid:**
-- Show a progress bar during model download with estimated size ("Downloading AI model... 12MB / 30MB")
-- Transformers.js provides download progress callbacks -- use `progress_callback` in the pipeline options
-- Pre-populate the cache on user opt-in ("Enable AI features" button that triggers the download proactively)
-- If self-hosting model files, set `Cache-Control: public, max-age=31536000, immutable` headers
-- Consider using a quantized (int8) model variant to reduce download from ~90MB to ~30MB
-- Show "Model cached" vs "First download required" in the UI
+- Use the "edit-until-applied" pattern already established by crop: strokes and text are editable overlays UNTIL the user explicitly applies them, at which point they are rasterized onto the source image
+- Store pending drawing strokes as an array of path data (points, color, thickness) in Zustand state
+- Store pending text as an object (text, font, size, color, x, y position) in Zustand state
+- Render the base image via the existing pipeline, THEN draw pending strokes/text on top in a second pass
+- When applied, render everything to an offscreen canvas, create a new `ImageBitmap`, and replace `sourceImage` -- this is exactly what `applyResize` already does
+- After applying, clear the pending strokes/text state
+- This means applied drawings become permanent and cannot be individually undone (same as crop behavior)
 
 **Warning signs:**
-- No progress callback wired up during model loading
-- No visual feedback between clicking "Remove Background" and getting a result
-- Model re-downloads on page reload (check Network tab)
-- No consideration of model file hosting (CDN, self-hosted, or Hugging Face default)
+- Trying to store drawing paths inside the `renderToCanvas` function's parameter list
+- Drawing directly to `canvasRef` without going through the render pipeline
+- Strokes disappear when the user adjusts brightness or rotates the image
+- Text overlay position shifts when the canvas re-renders
+- No "Apply" button for drawing/text (immediate destructive rendering)
 
 **Phase to address:**
-Model integration phase. Progress feedback and caching must be part of the initial model loading implementation, not an afterthought.
+Drawing/annotation phase AND text overlay phase. The architectural pattern must be decided before either feature is built. Both features share the same "overlay until applied" lifecycle.
 
 ---
 
-### Pitfall 4: Alpha Mask Applied Incorrectly to Existing Non-Destructive Pipeline
+### Pitfall 4: Drawing/Text Coordinates Misalign with Zoom, Pan, and CSS Scaling
 
 **What goes wrong:**
-The current pipeline (`renderToCanvas` in `utils/canvas.ts`) renders transforms and adjustments from the source `ImageBitmap`. Background removal produces a mask/alpha channel that must be composited. If the mask is applied at the wrong stage (before rotation, after crop, etc.), the mask and image become misaligned. The mask corresponds to the source image dimensions and orientation -- if transforms are applied to the image but not the mask, the background bleeds through or the foreground gets clipped.
+The user draws on the canvas while zoomed to 200% and panned to the right. The stroke appears in the wrong position because the pointer event coordinates are in screen space, but the canvas pixels are in image space. The CSS `transform: translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})` applied to the canvas wrapper means pointer coordinates must be un-transformed before mapping to canvas pixel coordinates.
 
 **Why it happens:**
-The existing pipeline operates on `ImageBitmap` with transforms as parameters. The segmentation model outputs a mask for the un-transformed source image. Developers apply the mask to the final rendered output, but the mask coordinates correspond to the pre-transform source. Rotation, flip, and crop all change the spatial relationship between mask and image.
+The Canvas component already handles this for crop (the CropOverlay uses percentage-based coordinates relative to the canvas rect). But drawing requires mapping screen coordinates to actual canvas pixel positions. There are THREE coordinate transformations in play: (1) CSS display scaling (canvas is fit-to-view, so its CSS size differs from its pixel dimensions), (2) zoom level (CSS `scale()` transform), and (3) pan offset (CSS `translate()` transform). Missing any one of these produces off-by-hundreds-of-pixels errors.
 
 **How to avoid:**
-- Apply the mask to the source image BEFORE the render pipeline processes transforms -- create a new `ImageBitmap` with the background already removed, then let the existing pipeline handle rotation/flip/crop as usual
-- Store `backgroundRemovedImage: ImageBitmap | null` in the Zustand store alongside `sourceImage`
-- When background removal is active, the render pipeline uses `backgroundRemovedImage` instead of `sourceImage` as its input
-- This approach requires zero changes to the existing `renderToCanvas` function
+- Create a utility function `screenToCanvas(clientX, clientY, canvasEl, zoomLevel, panOffset) => { x: number, y: number }` that handles all three transformations
+- Step 1: Subtract the canvas element's bounding rect position to get coordinates relative to the element
+- Step 2: Undo the CSS zoom/pan transform: `x = (clientX - panOffset.x) / zoomLevel`, `y = (clientY - panOffset.y) / zoomLevel`
+- Step 3: Scale from CSS display size to canvas pixel dimensions: `x = x * (canvas.width / cssWidth)`, `y = y * (canvas.height / cssHeight)`
+- Use this same utility for both drawing AND text drag positioning
+- Test with: zoom at 100% (no transform), zoom at 200% centered, zoom at 200% panned, and at 25% (minified)
 
 **Warning signs:**
-- Mask applied as a post-processing step after `renderToCanvas`
-- Mask coordinates not transforming with rotation/flip
-- Transparent "holes" appear in wrong places after rotating a background-removed image
-- Alpha artifacts along edges after cropping
+- Drawing works at 100% zoom but strokes appear offset when zoomed in
+- Strokes appear in the correct relative position but shift when panning
+- Text drag positioning jumps to a different location on first move
+- Drawing on a cropped image places strokes at incorrect positions
+- No coordinate transformation utility shared between drawing and text features
 
 **Phase to address:**
-Core integration phase. The architectural decision of WHERE in the pipeline the mask is applied determines the complexity of everything else.
+Drawing/annotation phase (first of the two overlay features). Build and test the coordinate mapping utility here so text overlay can reuse it.
 
 ---
 
-### Pitfall 5: Canvas Premultiplied Alpha Causes Edge Fringing Artifacts
+### Pitfall 5: Preset Filters (Sepia, Vintage, etc.) Conflict with User Adjustments
 
 **What goes wrong:**
-After applying the segmentation mask, the edges of the foreground subject show white or dark fringing -- a visible "halo" of semi-transparent pixels that look wrong against the checkerboard or any new background. This is especially noticeable on hair, fur, and other fine details.
+The user sets brightness to 120% and contrast to 80%. Then they apply a "Vintage" preset that sets sepia + reduced saturation + warm tint. The preset overwrites the user's adjustments, or the adjustments and preset stack in an unexpected way (double-brightness, wrong color balance). The user has no way to get their manual adjustments back.
 
 **Why it happens:**
-Canvas 2D uses premultiplied alpha internally. When you use `putImageData` with semi-transparent pixels, the browser premultiplies RGB by alpha. When the canvas is then composited (drawn onto another canvas, exported, or displayed over the CSS checkerboard), the premultiplication creates fringing. Additionally, `ctx.filter` (used for brightness/contrast) applied to semi-transparent pixels produces different results than applying filters to the opaque original -- the filter operates on premultiplied values, causing color shifts at transparent edges.
+Preset filters are conceptually a set of adjustments. The current `Adjustments` interface has `brightness`, `contrast`, `saturation`, and `greyscale`. A "Vintage" preset wants to set specific values for these AND add new properties (sepia, hue-rotate, color matrix). If presets modify the same `adjustments` state, they destroy the user's manual settings. If presets are a separate layer, the stacking order (preset first or adjustments first) affects the result.
 
 **How to avoid:**
-- Apply `ctx.filter` adjustments (brightness, contrast, saturation) to the image BEFORE applying the alpha mask, not after. The current pipeline does this correctly if the mask is baked into a separate `ImageBitmap` -- `ctx.filter` on a fully opaque source produces correct results, then the alpha from the mask is composited afterward
-- Use `globalCompositeOperation = 'destination-in'` to apply the mask rather than manual pixel manipulation -- this avoids the putImageData premultiplication issue
-- For edge refinement, apply a 1-2px feather to the mask to smooth the alpha transition and reduce hard fringing
-- Test with dark-haired subjects on light backgrounds and light-haired subjects on dark backgrounds -- these expose fringing most visibly
+- Presets should be a SEPARATE state property, not modifications to `adjustments`. Store `activePreset: string | null` in the editor store.
+- Build the filter string by composing preset filters THEN user adjustments: `ctx.filter = buildPresetString(preset) + ' ' + buildFilterString(adjustments)`. CSS filter functions compose left-to-right.
+- This means the preset provides a "base look" and user adjustments fine-tune on top. Users can change presets without losing their brightness/contrast tweaks.
+- Alternatively, presets could be a fixed set of filter values that replace adjustments, with a "Reset adjustments" action. This is simpler but less flexible.
+- Either way, define the interaction model BEFORE implementing: does applying a preset reset adjustments? Stack with them? Replace them?
 
 **Warning signs:**
-- White or dark "halo" around the subject edges
-- Edge quality looks worse after applying brightness/contrast adjustments
-- Manual `putImageData`/`getImageData` loops used for mask application instead of compositing operations
-- No feathering or edge refinement on the mask
+- Preset implementation directly calls `setAdjustment` for each property
+- No way to remove a preset without resetting all adjustments
+- Preset + adjustment interaction not specified in requirements
+- Filter string has conflicting values (e.g., `saturate(150%) saturate(80%)` -- which wins?)
+- No "None" or "Original" preset option to clear the preset
 
 **Phase to address:**
-Mask compositing phase. Edge quality is the primary quality differentiator between "demo-grade" and "production-grade" background removal.
+Preset filters phase. Must decide the preset/adjustment interaction model before building the UI.
 
 ---
 
-### Pitfall 6: Memory Exhaustion from Multiple Large Bitmaps
+### Pitfall 6: Blur on Large Images Causes Multi-Second Freeze During Live Preview
 
 **What goes wrong:**
-Background removal requires holding multiple large data structures simultaneously: the source `ImageBitmap`, the segmentation mask, a temporary canvas for mask application, and the resulting background-removed `ImageBitmap`. For a 4000x3000 image, each uncompressed bitmap is ~48MB (4000 * 3000 * 4 bytes RGBA). With source + mask + temp canvas + result, peak memory usage hits ~200MB for a single operation. On mobile Safari (with ~300MB canvas memory budget), this crashes the tab.
+The user drags a blur slider. On every slider value change, the render pipeline re-renders the full image with `ctx.filter = 'blur(Xpx)'`. For a 4000x3000 image, Gaussian blur is computationally expensive -- each pixel requires sampling a kernel proportional to the blur radius. At blur radius 10px, this is ~400 samples per pixel times 12M pixels. The browser freezes for 500ms-2s on each slider tick, making the slider feel broken.
 
 **Why it happens:**
-Developers do not track the lifecycle of intermediate bitmaps and canvases. The model itself also consumes 100-200MB of WASM heap memory. Combined with the image data, total memory can hit 400MB+, well beyond mobile browser limits.
+The existing adjustments (brightness, contrast, saturation) are cheap `ctx.filter` operations -- they are per-pixel multiplications with no neighbor sampling. Blur is fundamentally different: it is an O(n * r^2) operation where n = pixel count and r = blur radius. The current pipeline re-renders on every state change with no throttling or preview optimization.
 
 **How to avoid:**
-- Close intermediate `ImageBitmap` objects immediately after use with `.close()` -- the existing codebase already does this for `sourceImage` swaps, so follow the same pattern
-- Use `canvas.width = 0; canvas.height = 0` to release temporary canvas memory
-- Downscale oversized images before feeding them to the model -- most segmentation models accept 1024x1024 or 512x512 input anyway, so downscaling is both a memory optimization and a model requirement
-- Run the model on a downscaled version, then upscale the mask back to original dimensions for application
-- Set `canvas.width = 0` on temporary canvases created during mask application
-- Consider `ImageBitmap.close()` on the pre-removal source if the user confirms they want to keep the result
+- **Debounce or throttle** the blur slider: only re-render after the user stops dragging for 150-200ms, showing the last rendered frame during drag
+- **Preview at reduced resolution:** During slider interaction, render to a canvas at 1/4 resolution (1000x750 instead of 4000x3000), then render full resolution on slider release
+- **Use `requestAnimationFrame`** instead of synchronous rendering: schedule renders at display refresh rate, skip intermediate values
+- The existing pipeline re-renders in a `useEffect` triggered by state changes. Add a debounce wrapper specifically for blur/sharpen values.
+- Consider whether blur should be applied to the entire image or just a preview region
 
 **Warning signs:**
-- No `.close()` calls on intermediate ImageBitmap objects
-- Temporary canvases created but never cleaned up
-- Full-resolution image passed directly to the model (unnecessary; models resize internally anyway)
-- Memory usage climbs with each "remove background" attempt (check browser task manager)
-- Mobile users reporting tab crashes during background removal
+- Blur slider moves in visible steps with freezes between each
+- Browser shows "long task" warnings in DevTools for blur renders
+- No difference in render path between cheap filters (brightness) and expensive filters (blur)
+- Slider `onChange` triggers immediate state update with no debouncing
+- Testing only done on small images (under 1 megapixel)
 
 **Phase to address:**
-Core integration phase. Memory management must be designed into the mask-application pipeline from the start.
+Blur/sharpen phase. Performance optimization must be part of the initial blur implementation, not a follow-up -- a laggy slider is unusable.
 
 ---
 
-### Pitfall 7: WebGPU/WASM Backend Detection and Fallback Handled Incorrectly
+### Pitfall 7: Drawing Strokes Disappear on Every Re-render Because Pipeline Clears Canvas
 
 **What goes wrong:**
-The app tries to use WebGPU for faster inference but crashes or silently fails on browsers/devices that do not support it (Safari as of early 2026, older Chrome, all Firefox). The developer tests on Chrome with WebGPU and ships, then users on Safari get a blank result, an error, or infinite loading.
+The user draws three strokes on the canvas. Then they adjust brightness. The `useRenderPipeline` effect fires, calls `renderToCanvas`, which sets `ctx.canvas.width = rotatedW` (clearing the canvas), and redraws the image. The three strokes are gone because they were drawn directly to the canvas DOM element, not stored as state.
 
 **Why it happens:**
-WebGPU support is still not universal. Checking `navigator.gpu` is not sufficient -- the adapter may be null, or the device may lack required features. Transformers.js may fall back to WASM automatically, but the fallback behavior is not always reliable, and the performance characteristics change dramatically (WebGPU: 1-3s inference, WASM: 5-30s inference).
+The render pipeline is designed to be stateless: it reads state (source, transforms, adjustments, crop, mask) and produces a fresh canvas output. Anything drawn directly to the canvas outside this pipeline is transient. This is correct behavior for the pipeline -- the problem is drawing to the same canvas the pipeline manages.
 
 **How to avoid:**
-- Default to WASM backend, which works everywhere -- do not default to WebGPU
-- If using WebGPU as an optimization, wrap in a try/catch with explicit fallback: attempt WebGPU, on failure fall back to WASM
-- Test on Safari (no WebGPU), Firefox (no WebGPU), Chrome (WebGPU available), and mobile Safari
-- Adjust the loading/progress UI to account for WASM being 3-10x slower than WebGPU
-- Set `device: 'cpu'` (WASM) as default in Transformers.js pipeline options, not `device: 'webgpu'`
+- **Overlay canvas approach (recommended):** Add a second `<canvas>` element positioned absolutely on top of the main canvas. Drawing strokes go on the overlay canvas. The main canvas is managed by the render pipeline as before. The overlay canvas is only cleared/redrawn from the stored stroke state, not by the render pipeline.
+- The overlay canvas must be sized and positioned identically to the main canvas, including zoom/pan transforms
+- When the user clicks "Apply," render both canvases to an offscreen canvas, create a new `ImageBitmap`, and replace `sourceImage` (same pattern as `applyResize`)
+- Store strokes as `Array<{ points: {x,y}[], color: string, thickness: number }>` in Zustand
+- On each stroke state change, clear the overlay canvas and redraw all pending strokes
+- Text overlays can use either the overlay canvas or a positioned HTML `<div>` (HTML is better for text editing UX)
 
 **Warning signs:**
-- `device: 'webgpu'` hardcoded without fallback
-- No try/catch around model initialization
-- Only tested on Chrome desktop
-- No error handling for model loading failures
-- Different behavior on Safari vs Chrome with no explanation
+- Only one `<canvas>` element in the component tree
+- Drawing code calls `canvasRef.current.getContext('2d')` directly (same context as render pipeline)
+- Strokes vanish when any other state changes (brightness slider, rotate, etc.)
+- No stroke storage in Zustand state
+- Drawing and pipeline share the same `ctx` reference
 
 **Phase to address:**
-Model integration phase. Backend selection and fallback must be part of the initial model loading setup.
+Drawing/annotation phase. The overlay canvas architecture must be set up before any drawing code is written.
+
+---
+
+### Pitfall 8: Text Overlay Rendered to Canvas Cannot Be Edited After Placement
+
+**What goes wrong:**
+The user adds text "Hello World" at position (100, 200) on the canvas using `ctx.fillText()`. They want to change the font size. But the text is now pixels on the canvas -- there is no object to select, move, or edit. The text is indistinguishable from any other pixel data.
+
+**Why it happens:**
+Canvas 2D is an immediate-mode API. Once you draw text with `fillText()`, it becomes pixels. There is no scene graph or object model. Libraries like Fabric.js and Konva.js add object models on top of canvas, but this project explicitly chose vanilla Canvas API ("Image editors don't need object/layer abstractions").
+
+**How to avoid:**
+- Keep text as an HTML `<div>` or `<input>` overlay positioned on top of the canvas until applied. This gives you native text editing (cursor, selection, copy/paste), native font rendering, and CSS-based styling for free.
+- The text overlay `<div>` must be positioned within the same zoom/pan wrapper as the canvas so it moves and scales together
+- Store text state as `{ text: string, fontFamily: string, fontSize: number, color: string, x: number, y: number, bold: boolean, italic: boolean }` in Zustand
+- Position the `<div>` using CSS `left`/`top` relative to the canvas wrapper, with coordinates in image-space percentage (like crop does with percentage coordinates)
+- On "Apply," render the text to the canvas using `ctx.fillText()` with matching font properties, create a new `ImageBitmap`, replace `sourceImage`
+- Font rendering differences between HTML and Canvas: test that `ctx.font` matches the CSS font rendering closely enough. Some differences in kerning and anti-aliasing are inevitable.
+
+**Warning signs:**
+- Text rendered directly to canvas with no preview/edit mode
+- No HTML overlay element for text input
+- Text cannot be repositioned after initial placement
+- Text position stored in pixel coordinates instead of percentage-based coordinates
+- No "Apply text" button in the UI (text immediately baked into canvas)
+- Font rendering looks different between edit mode and applied result
+
+**Phase to address:**
+Text overlay phase. The HTML overlay approach must be designed before any text rendering code is written.
 
 ---
 
@@ -193,97 +231,103 @@ Model integration phase. Backend selection and fallback must be part of the init
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Running model inference on main thread | No Web Worker setup needed | Freezes UI for 5-30s, unusable on mobile, no cancel capability | Never -- even for MVP, the worker is essential |
-| Storing mask as separate canvas layer | Simpler initial implementation | Extra memory, compositing bugs with transforms, double-draw on every render | MVP only; replace with baked ImageBitmap before shipping |
-| Loading full-precision model | Slightly better edge quality | 90MB download vs 30MB, 3x memory usage, longer inference | Never for browser use -- quantized models are the standard |
-| Applying mask after render pipeline | No changes to existing renderToCanvas | Mask misaligns with rotation/flip/crop, edge artifacts with ctx.filter | Never -- apply mask to source before pipeline |
-| Hardcoding model URL to Hugging Face CDN | No asset hosting needed | Depends on third-party uptime, no cache control, CORS issues on some deployments | Acceptable for development; self-host for production |
+| Drawing directly to the main canvas (no overlay) | No second canvas to manage | Strokes vanish on every re-render; no edit-before-apply possible | Never -- fundamentally broken with the existing pipeline |
+| Implementing blur via ctx.filter only | Simple one-line addition | Does not work on Safari (18% of users); sharpen still needs different path | Acceptable if Safari support is explicitly out of scope |
+| Preset filters as adjustment overrides | No new state property needed | Destroys user's manual adjustments; no way to toggle preset independently | Never -- user frustration is immediate |
+| Storing drawing coordinates in pixel space | Simpler coordinate math | Breaks when image is cropped, rotated, or resized; coordinates are resolution-dependent | Never -- use image-space coordinates from the start |
+| Text as canvas-only (no HTML overlay) | No DOM/Canvas synchronization needed | Cannot edit text after placement; no native text input UX; must implement cursor/selection from scratch | Never -- the complexity of reimplementing text editing in canvas is far worse than the DOM/canvas sync |
+| Convolution (sharpen) in main thread synchronously | No worker setup | Freezes UI for 500ms-2s on large images | MVP only if images are capped at 2 megapixels; add debounce at minimum |
 
 ## Integration Gotchas
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Transformers.js + Vite | Vite tries to optimize/bundle the ONNX Runtime WASM files, causing 404s or corrupt WASM | Exclude `@huggingface/transformers` and `onnxruntime-web` from Vite's `optimizeDeps`; configure `assetsInclude` for `.wasm` files; or use the CDN-hosted WASM files |
-| Web Worker + Vite | Worker import paths break in production builds | Use Vite's `new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })` syntax for correct bundling |
-| Segmentation output + Canvas | Model outputs a grayscale mask or raw tensor, not an alpha-ready ImageData | Convert model output to a proper alpha mask: map mask values (0.0-1.0) to alpha channel (0-255), set RGB to the source image pixels |
-| `ctx.filter` + transparency | Brightness/contrast filters on semi-transparent pixels produce incorrect colors | Apply filters to the opaque source image first, then composite the mask afterward |
-| `ImageBitmap` + Web Worker | `ImageBitmap` created in worker cannot be drawn to main-thread canvas in some browsers | Transfer the `ImageBitmap` back to main thread via `postMessage` with transferable list; or transfer raw `ImageData` and create bitmap on main thread |
+| Overlay canvas + zoom/pan | Overlay canvas does not follow the CSS transform on the main canvas wrapper | Place the overlay canvas INSIDE the same zoom/pan wrapper div; apply identical `width`/`height` CSS |
+| Text HTML overlay + canvas export | HTML text looks different from `ctx.fillText()` result after applying | Match `ctx.font` string exactly to CSS font properties; test with multiple fonts; accept minor anti-aliasing differences |
+| Drawing + crop interaction | User draws on cropped image, then undoes crop -- stroke position is wrong | Store stroke coordinates relative to the CURRENT canvas state (post-crop), and when applying, render at those positions on the current output canvas (not the source) |
+| Blur + background mask | `ctx.filter = 'blur(5px)'` blurs the ENTIRE canvas including transparent areas, bleeding background color into edges | Apply blur before mask compositing, not after. The existing pipeline already applies `ctx.filter` before `destination-in` compositing. |
+| Preset filter + greyscale toggle | Preset sets `sepia(100%)` but greyscale toggle adds `grayscale(100%)` -- `grayscale` after `sepia` produces different result than `sepia` after `grayscale` | Define a fixed filter ordering in `buildFilterString`: greyscale first, then preset, then adjustments. Document the ordering. |
+| Freehand drawing + pointer events + zoom panning | Drawing pointerdown conflicts with pan pointerdown -- both want to capture the pointer | Use a tool mode state (`activeTool: 'pan' | 'draw' | 'text' | 'shape'`); pointer handlers check active tool before acting |
 
 ## Performance Traps
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Feeding full-resolution image to model | 30s+ inference time, high memory | Downscale to model's native input size (typically 1024x1024), upscale mask back | Images > 2 megapixels |
-| Re-running inference on every adjustment | Seconds-long delay on each brightness/contrast change | Cache the mask; only re-run inference when source image changes, not when adjustments change | Any adjustment slider interaction |
-| Loading model eagerly on page load | 30-90MB download before user even needs it, wasted bandwidth | Lazy-load model on first "Remove Background" click; show download progress | Always -- most users may never use background removal |
-| Not disposing ONNX session | WASM heap memory (~100-200MB) never freed | Call `session.release()` or let Transformers.js handle cleanup after inference; consider disposing when user loads a new image | After 2-3 background removal operations |
-| Transferring ImageData by copy instead of transfer | Double memory spike (data exists in both threads briefly) | Use `postMessage(data, [data.buffer])` to transfer ownership, not copy | Images > 3 megapixels |
+| Blur re-rendered on every slider tick | Slider stutters, browser DevTools shows "long task" warnings | Debounce blur slider to 150ms; render at reduced resolution during drag | Images > 2 megapixels with blur radius > 5px |
+| Sharpen convolution on full-resolution image | 500ms-2s freeze per slider change | Debounce; consider Web Worker for convolution; preview at 1/4 resolution | Images > 3 megapixels |
+| Redrawing all strokes on every pointer move | Drawing feels laggy; canvas flickers | Only draw the current stroke incrementally during pointer move; full redraw from stroke array only on stroke completion | > 50 strokes with > 100 points each |
+| Creating offscreen canvases per render in the pipeline | GC pressure, memory spikes | Reuse a persistent offscreen canvas (resize instead of recreate) | Rapid slider dragging (60 renders/second) |
+| Preset filter applied via getImageData pixel manipulation | 200ms+ per application, laggy preset switching | Use ctx.filter string composition for presets (sepia, hue-rotate, etc. are all CSS filter functions) | Any image > 1 megapixel |
 
 ## UX Pitfalls
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| No progress during model download | User thinks app is frozen, closes tab, download wasted | Show progress bar with MB downloaded / total MB |
-| "Remove Background" button with no indication of model size | User on mobile data unknowingly downloads 30MB+ | First-time tooltip: "This will download a 30MB AI model (one-time)" |
-| No way to undo background removal | User removes background, adjusts, realizes removal was wrong, must re-upload | Store original source image; add "Restore Background" toggle |
-| Background removal result looks bad on white canvas | Users expect to see the transparent result but see it against the editor's white/dark background | Show checkerboard pattern behind transparent areas (the CSS checkerboard-bg class already exists) |
-| No visual difference between "processing" and "complete" | User does not know when removal is done | Transition from loading spinner to result with a brief animation or notification |
-| JPEG selected after background removal | User downloads and loses transparency without understanding why | Auto-switch to PNG when background is removed; show explanation if user switches to JPEG |
+| No visual indicator of active tool mode | User tries to pan but draws instead, or tries to draw but pans | Show active tool in toolbar with highlight; change cursor (crosshair for draw, text cursor for text, grab for pan) |
+| Drawing strokes cannot be undone individually | User makes one bad stroke and must undo ALL pending strokes | Support per-stroke undo by popping from the strokes array; this is cheap since strokes are stored as data |
+| Preset filter preview requires clicking each one | User must apply-then-undo each preset to compare | Show thumbnail previews of each preset applied to the current image (render at thumbnail size -- 100x75px -- for each preset) |
+| Text overlay has no visible bounding box | User cannot tell where text will render; cannot see drag handle | Show a dashed border around the text div during edit mode; show resize handles if font size is adjustable |
+| Blur/sharpen slider has no visual reference for "no effect" | User does not know which direction increases/decreases effect | Label the slider: 0 = no effect in center, left = blur, right = sharpen. Or use two separate sliders with 0-100 range each. |
+| Applied drawings cannot be removed | User applies drawing then realizes a mistake | Warn before applying: "Drawing will be permanently merged into the image. This cannot be undone." Consider adding undo/redo history (noted as future candidate in PROJECT.md). |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **JPEG export:** After removing background, download as JPEG -- verify transparent areas are white (not black) and user was warned about transparency loss
-- [ ] **Rotation after removal:** Remove background, then rotate 90 degrees -- verify the mask rotates correctly with the image (no misaligned transparency)
-- [ ] **Crop after removal:** Remove background, then crop -- verify transparent areas remain transparent in the cropped result
-- [ ] **Adjustments after removal:** Remove background, then adjust brightness -- verify edge quality does not degrade (no color fringing at mask edges)
-- [ ] **Resize after removal:** Remove background, then resize -- verify the `applyResize` function (which flattens to a new ImageBitmap) preserves the alpha channel
-- [ ] **Mobile memory:** Run background removal on a 4000x3000 image on iOS Safari -- verify no tab crash
-- [ ] **Model caching:** Remove background, reload the page, remove background again -- verify the model does not re-download (check Network tab)
-- [ ] **Safari compatibility:** Run background removal on Safari (no WebGPU) -- verify it falls back to WASM and completes successfully
-- [ ] **Cancel/new image:** Start background removal, then upload a new image before it finishes -- verify no orphaned worker, no stale result applied to the new image
-- [ ] **Undo/restore:** Remove background, then click "Restore Background" -- verify the original image is fully restored with no quality loss
+- [ ] **Safari blur:** Open the app on Safari -- verify that blur filter actually applies (ctx.filter may be silently ignored)
+- [ ] **Safari adjustments:** Open the app on Safari -- verify that brightness/contrast/saturation sliders actually affect the image (pre-existing ctx.filter issue)
+- [ ] **Sharpen at high values:** Set sharpen to maximum on a photo -- verify no pixel overflow artifacts (RGB values clamping to 0-255)
+- [ ] **Draw while zoomed:** Zoom to 200%, pan to a corner, draw a stroke -- verify the stroke appears under the cursor, not offset
+- [ ] **Draw then rotate:** Draw strokes, then rotate the image 90 degrees -- verify strokes are still visible and correctly positioned (they should be, since strokes are on an overlay that re-renders from state)
+- [ ] **Draw then adjust brightness:** Draw strokes, then change brightness -- verify strokes are NOT affected by the brightness change (they are on a separate overlay)
+- [ ] **Text then crop:** Place text, apply it, then crop -- verify the text is included in the crop result and positioned correctly
+- [ ] **Preset + adjustments:** Apply "Vintage" preset, then adjust brightness to 120% -- verify both the preset look and the brightness increase are visible
+- [ ] **Preset then download:** Apply a preset filter, download the image -- verify the downloaded image has the preset applied (filter must be applied during export rendering, not just CSS display)
+- [ ] **Apply drawing then download:** Draw strokes, apply them, download -- verify strokes appear in the downloaded image at correct positions and colors
+- [ ] **Blur + background removal:** Remove background, apply blur -- verify blur does not bleed the replacement color into the subject edges
+- [ ] **Text on transparent background:** Remove background, add text on the transparent area, apply -- verify text renders correctly over transparency
+- [ ] **Mobile drawing:** Test freehand drawing on a touch device -- verify touch events produce smooth strokes without triggering page scroll or zoom
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| JPEG export destroys transparency | LOW | Add white-fill before JPEG encode and auto-format-switch. Isolated to download.ts. |
-| Main thread blocking | HIGH | Requires creating a Web Worker, moving model code to worker, adding message protocol. Touches model loading, inference, and result handling. |
-| No download progress | LOW | Wire up Transformers.js `progress_callback`. Isolated to model loading code. |
-| Mask misalignment with transforms | HIGH | Requires rethinking where in the pipeline the mask is applied. May need to refactor renderToCanvas or add a pre-pipeline compositing step. |
-| Edge fringing artifacts | MEDIUM | Switch from putImageData to compositing operations. May require adjusting mask application approach. |
-| Memory exhaustion | MEDIUM | Add `.close()` calls and canvas cleanup. Requires tracing all intermediate objects through the pipeline. |
-| WebGPU fallback failure | LOW | Wrap in try/catch, default to WASM. Isolated to model initialization. |
+| Safari ctx.filter failure | MEDIUM | Add runtime feature detection + polyfill (context-filter-polyfill) or manual getImageData fallback. Affects buildFilterString and renderToCanvas. |
+| Sharpen as ctx.filter (impossible) | LOW | Replace with convolution kernel. Isolated to a new utility function. |
+| Drawing to main canvas (no overlay) | HIGH | Must add overlay canvas, refactor Canvas component, separate drawing context from render pipeline context. |
+| Coordinate misalignment with zoom | MEDIUM | Create screenToCanvas utility and update all pointer handlers. Requires understanding the full transform chain. |
+| Preset overwrites adjustments | LOW | Add `activePreset` to store, compose filter strings separately. Isolated to store and buildFilterString. |
+| Blur performance on large images | MEDIUM | Add debouncing and/or reduced-resolution preview. Requires changes to useRenderPipeline and slider components. |
+| Text baked immediately (no edit mode) | HIGH | Must add HTML overlay, text state management, apply workflow. Requires new component, store additions, and render integration. |
 
 ## Pitfall-to-Phase Mapping
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| JPEG transparency loss | Export integration | Download background-removed image as JPEG; transparent areas should be white, not black |
-| Main thread blocking | Worker architecture | Click "Remove Background" on a 4000x3000 image; UI sliders and buttons must remain responsive during inference |
-| Model download UX | Model loading | On first click, progress bar shows MB downloaded; on second visit, model loads from cache in <1s |
-| Mask/pipeline misalignment | Core integration | Remove background, rotate 90, flip horizontal, crop center -- all operations should produce correct transparent output |
-| Edge fringing | Mask compositing | Inspect edges of a dark-haired subject on checkerboard; no white or dark halo should be visible |
-| Memory exhaustion | Core integration | Run background removal on a 4000x3000 image on mobile Safari; tab should not crash; memory should return to baseline after operation |
-| WebGPU fallback | Model loading | Test on Safari and Firefox; background removal should complete (slower) without errors |
-| Stale result on new image | State management | Start removal, upload new image immediately; verify new image appears without the old mask applied |
+| Safari ctx.filter | Blur/sharpen (phase 1) | Open app on Safari; adjust brightness slider; verify image changes |
+| Sharpen needs convolution | Blur/sharpen (phase 1) | Apply sharpen at intensity 50%; verify image edges are visibly sharpened |
+| Drawing disappears on re-render | Drawing/annotation (phase 3 or 4) | Draw 3 strokes, adjust brightness, verify strokes remain visible |
+| Coordinate misalignment | Drawing/annotation (phase 3 or 4) | Zoom to 200%, pan right, draw a stroke; verify stroke is under cursor |
+| Preset/adjustment conflict | Preset filters (phase 2) | Apply "Vintage" preset, set brightness to 130%; verify both effects are visible; remove preset; verify brightness remains |
+| Blur performance | Blur/sharpen (phase 1) | Load 4000x3000 image, drag blur slider from 0 to 10; verify no freeze longer than 200ms |
+| Strokes as state | Drawing/annotation (phase 3 or 4) | Draw 5 strokes, apply them, download image; verify all 5 strokes appear in downloaded file |
+| Text edit-until-apply | Text overlay (phase 3 or 4) | Add text, drag to reposition, change font size, then apply; verify all edits reflect in final image |
+| Tool mode conflicts | Drawing/annotation (phase 3 or 4) | Switch to draw tool, verify panning is disabled; switch to pan tool, verify drawing is disabled |
+| Blur + background mask | Blur/sharpen (phase 1) | Remove background, apply blur at radius 5; verify no color bleeding at subject edges |
 
 ## Sources
 
-- [Transformers.js background removal with WebGPU - Medium](https://medium.com/myorder/building-an-ai-background-remover-using-transformer-js-and-webgpu-882b0979f916)
-- [Building a background remover with Vue and Transformers.js - LogRocket](https://blog.logrocket.com/building-background-remover-vue-transformers-js/)
-- [Addy Osmani's bg-remove (Transformers.js reference implementation) - GitHub](https://github.com/addyosmani/bg-remove)
-- [Wes Bos bg-remover - GitHub](https://github.com/wesbos/bg-remover)
-- [@imgly/background-removal WASM issues - GitHub](https://github.com/imgly/background-removal-js/issues/124)
-- [ONNX Runtime Web WASM memory limits - GitHub Issue #10957](https://github.com/microsoft/onnxruntime/issues/10957)
-- [ONNX Runtime Web iOS WASM failure - GitHub Issue #22086](https://github.com/microsoft/onnxruntime/issues/22086)
-- [Canvas premultiplied alpha quantization - DEV Community](https://dev.to/yoya/canvas-getimagedata-premultiplied-alpha-150b)
-- [ImageData alpha premultiplication spec discussion - WHATWG](https://github.com/whatwg/html/issues/5365)
-- [OffscreenCanvas and Web Workers - MDN](https://developer.mozilla.org/en-US/docs/Web/API/OffscreenCanvas)
-- [Optimizing Transformers.js for Production - SitePoint](https://www.sitepoint.com/optimizing-transformers-js-production/)
-- [Transformers.js v4 with WebGPU - adwaitx.com](https://www.adwaitx.com/transformers-js-v4-webgpu-browser-ai/)
-- [Firefox JPEG alpha channel behavior - Mozilla Support](https://support.mozilla.org/en-US/questions/1528694)
+- [CanvasRenderingContext2D.filter - Can I Use](https://caniuse.com/mdn-api_canvasrenderingcontext2d_filter) -- Safari support status: disabled by default through Safari 26.4
+- [WebKit Bug #198416 - Support CanvasRenderingContext2D.filter](https://bugs.webkit.org/show_bug.cgi?id=198416) -- Open since 2019, still unresolved
+- [context-filter-polyfill (GitHub)](https://github.com/davidenke/context-filter-polyfill) -- Polyfill for ctx.filter on Safari
+- [CanvasRenderingContext2D.filter - MDN](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/filter) -- Filter syntax reference
+- [Image filters with canvas - web.dev](https://web.dev/canvas-imagefilters/) -- Convolution kernel implementation patterns
+- [Mozilla Bug #1498291 - CSS blur effects highly inefficient in canvas filters](https://bugzilla.mozilla.org/show_bug.cgi?id=1498291) -- Blur performance issues
+- [Optimizing canvas - MDN](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Optimizing_canvas) -- Canvas performance best practices
+- [Exploring canvas drawing techniques - Perfection Kills](https://perfectionkills.com/exploring-canvas-drawing-techniques/) -- Freehand drawing smoothing techniques
+- [perfect-freehand (GitHub)](https://github.com/steveruizok/perfect-freehand) -- Pressure-sensitive freehand stroke library
+- [JavaScript sharpen convolution function (GitHub Gist)](https://gist.github.com/mikecao/65d9fc92dc7197cb8a7c) -- Manual sharpen kernel implementation
+- [Canva Engineering - Behind the Draw](https://www.canva.dev/blog/engineering/behind-the-draw/) -- Production freehand drawing architecture
+- [Canvas Transformations - MDN](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Transformations) -- Coordinate transformation reference
 
 ---
-*Pitfalls research for: in-browser AI background removal integration with canvas-based image editor*
+*Pitfalls research for: blur/sharpen filters, preset image filters, text overlay, and drawing/annotation in Canvas 2D image editor*
 *Researched: 2026-03-14*
