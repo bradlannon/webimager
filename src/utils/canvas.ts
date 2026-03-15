@@ -4,6 +4,7 @@ import { applySharpen } from './sharpen';
 
 function bakeTexts(ctx: CanvasRenderingContext2D, texts: TextEntry[]): void {
   for (const entry of texts) {
+    if (!entry.content) continue;
     ctx.save();
     const parts: string[] = [];
     if (entry.style.italic) parts.push('italic');
@@ -11,10 +12,20 @@ function bakeTexts(ctx: CanvasRenderingContext2D, texts: TextEntry[]): void {
     parts.push(`${entry.style.fontSize}px`);
     parts.push(entry.style.fontFamily);
     ctx.font = parts.join(' ');
-    ctx.fillStyle = entry.style.color;
     ctx.textBaseline = 'top';
     const px = (entry.x / 100) * ctx.canvas.width;
     const py = (entry.y / 100) * ctx.canvas.height;
+
+    // Draw text outline for visibility on any background
+    ctx.lineWidth = Math.max(1, entry.style.fontSize * 0.06);
+    ctx.strokeStyle = entry.style.color === '#FFFFFF' || entry.style.color === '#ffffff'
+      ? 'rgba(0, 0, 0, 0.5)'
+      : 'rgba(255, 255, 255, 0.5)';
+    ctx.lineJoin = 'round';
+    ctx.strokeText(entry.content, px, py);
+
+    // Draw filled text on top of outline
+    ctx.fillStyle = entry.style.color;
     ctx.fillText(entry.content, px, py);
     ctx.restore();
   }

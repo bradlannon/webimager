@@ -137,6 +137,11 @@ export function BottomBar() {
     if (cropMode) {
       applyCrop();
     }
+    // Text tab toggles panel without discarding draft text
+    if (tabId === 'text') {
+      setActiveTab((current) => (current === 'text' ? null : 'text'));
+      return;
+    }
     setActiveTab((current) => (current === tabId ? null : tabId));
   };
 
@@ -145,17 +150,15 @@ export function BottomBar() {
     if (activeTab === 'crop' && cropMode) {
       applyCrop();
     }
-    // Auto-discard text when closing panel via backdrop
-    if (textMode) {
-      discardText();
-    }
+    // When text mode is active, closing the panel just hides it (keeps draft alive)
+    // User can still drag text and use Apply/Cancel on the overlay
     setActiveTab(null);
   };
 
   return (
     <>
       {/* Overlay panel */}
-      <OverlayPanel open={activeTab !== null} onClose={handleClosePanel} disableBackdrop={activeTab === 'crop'}>
+      <OverlayPanel open={activeTab !== null} onClose={handleClosePanel} disableBackdrop={activeTab === 'crop' || (activeTab === 'text' && textMode)}>
         {activeTab && <PanelContent tabId={activeTab} bgRemoval={bgRemoval} />}
       </OverlayPanel>
 
@@ -163,7 +166,7 @@ export function BottomBar() {
       <nav className="glass fixed bottom-0 left-0 right-0 z-50 h-[48px] md:h-[56px] border-t border-neutral-200/60">
         <div className="flex items-center justify-around h-full px-1 md:px-2">
           {tabs.map(({ id, label, icon: Icon }) => {
-            const isActive = activeTab === id || (id === 'crop' && cropMode);
+            const isActive = activeTab === id || (id === 'crop' && cropMode) || (id === 'text' && textMode);
             return (
               <button
                 key={id}
