@@ -10,6 +10,8 @@ export interface Adjustments {
   contrast: number;
   saturation: number;
   greyscale: boolean;
+  blur: number;     // 0-20 px radius
+  sharpen: number;  // 0-100 intensity
 }
 
 export const defaultAdjustments: Adjustments = {
@@ -17,6 +19,8 @@ export const defaultAdjustments: Adjustments = {
   contrast: 100,
   saturation: 100,
   greyscale: false,
+  blur: 0,
+  sharpen: 0,
 };
 
 export interface EditorState {

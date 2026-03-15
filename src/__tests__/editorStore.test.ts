@@ -128,6 +128,22 @@ describe('editorStore', () => {
       useEditorStore.getState().toggleGreyscale()
       expect(useEditorStore.getState().adjustments.greyscale).toBe(false)
     })
+
+    test('default adjustments include blur=0 and sharpen=0', () => {
+      const { adjustments } = useEditorStore.getState()
+      expect(adjustments.blur).toBe(0)
+      expect(adjustments.sharpen).toBe(0)
+    })
+
+    test('setAdjustment sets blur', () => {
+      useEditorStore.getState().setAdjustment('blur', 10)
+      expect(useEditorStore.getState().adjustments.blur).toBe(10)
+    })
+
+    test('setAdjustment sets sharpen', () => {
+      useEditorStore.getState().setAdjustment('sharpen', 50)
+      expect(useEditorStore.getState().adjustments.sharpen).toBe(50)
+    })
   })
 
   describe('resetAll', () => {
@@ -142,10 +158,19 @@ describe('editorStore', () => {
 
     test('returns adjustments to defaults', () => {
       useEditorStore.setState({
-        adjustments: { brightness: 150, contrast: 80, saturation: 50, greyscale: true },
+        adjustments: { brightness: 150, contrast: 80, saturation: 50, greyscale: true, blur: 10, sharpen: 50 },
       })
       useEditorStore.getState().resetAll()
       expect(useEditorStore.getState().adjustments).toEqual(defaultAdjustments)
+    })
+
+    test('resets blur and sharpen to 0', () => {
+      useEditorStore.setState({
+        adjustments: { ...defaultAdjustments, blur: 15, sharpen: 75 },
+      })
+      useEditorStore.getState().resetAll()
+      expect(useEditorStore.getState().adjustments.blur).toBe(0)
+      expect(useEditorStore.getState().adjustments.sharpen).toBe(0)
     })
   })
 
@@ -168,6 +193,8 @@ describe('editorStore', () => {
       expect(state.transforms.flipH).toBe(false)
       expect(state.transforms.flipV).toBe(false)
       expect(state.adjustments).toEqual(defaultAdjustments)
+      expect(state.adjustments.blur).toBe(0)
+      expect(state.adjustments.sharpen).toBe(0)
     })
 
     test('closes previous bitmap when setting new image', () => {

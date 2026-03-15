@@ -175,7 +175,27 @@ describe('buildFilterString', () => {
         contrast: 110,
         saturation: 80,
         greyscale: true,
+        blur: 0,
+        sharpen: 0,
       })
     ).toBe('brightness(120%) contrast(110%) saturate(80%) grayscale(100%)')
+  })
+
+  test('returns blur filter when blur > 0', () => {
+    expect(
+      buildFilterString({ ...defaultAdjustments, blur: 5, sharpen: 0 })
+    ).toBe('blur(5px)')
+  })
+
+  test('blur=0 produces no blur token', () => {
+    const result = buildFilterString({ ...defaultAdjustments, blur: 0, sharpen: 0 })
+    expect(result).toBe('none')
+    expect(result).not.toContain('blur')
+  })
+
+  test('defaults with blur=0 and sharpen=0 returns "none"', () => {
+    expect(
+      buildFilterString({ ...defaultAdjustments, blur: 0, sharpen: 0 })
+    ).toBe('none')
   })
 })

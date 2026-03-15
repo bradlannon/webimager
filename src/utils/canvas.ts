@@ -1,5 +1,6 @@
 import type { Transforms, Adjustments, CropRegion, RenderOptions } from '../types/editor';
 import { cropToPixels } from './crop';
+import { applySharpen } from './sharpen';
 
 export const MAX_CANVAS_PIXELS = 16_777_216;
 
@@ -27,6 +28,7 @@ export function buildFilterString(adjustments: Adjustments): string {
   if (adjustments.contrast !== 100) parts.push(`contrast(${adjustments.contrast}%)`);
   if (adjustments.saturation !== 100) parts.push(`saturate(${adjustments.saturation}%)`);
   if (adjustments.greyscale) parts.push('grayscale(100%)');
+  if (adjustments.blur > 0) parts.push(`blur(${adjustments.blur}px)`);
   return parts.length > 0 ? parts.join(' ') : 'none';
 }
 
@@ -73,6 +75,11 @@ export function renderToCanvas(
     }
     ctx.drawImage(offscreen, sx, sy, sw, sh, 0, 0, sw, sh);
     ctx.restore();
+
+    // Apply sharpen convolution after draw (not a CSS filter)
+    if (adjustments?.sharpen && adjustments.sharpen > 0) {
+      applySharpen(ctx, adjustments.sharpen);
+    }
 
     // Step 3: Apply background mask AFTER filters (avoids premultiplied alpha fringing)
     if (backgroundMask) {
@@ -128,6 +135,11 @@ export function renderToCanvas(
     }
     ctx.drawImage(source, -source.width / 2, -source.height / 2);
     ctx.restore();
+
+    // Apply sharpen convolution after draw (not a CSS filter)
+    if (adjustments?.sharpen && adjustments.sharpen > 0) {
+      applySharpen(ctx, adjustments.sharpen);
+    }
 
     // Apply background mask AFTER filters (avoids premultiplied alpha fringing)
     if (backgroundMask) {
