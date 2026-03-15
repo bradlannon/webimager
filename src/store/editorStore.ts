@@ -1,8 +1,9 @@
 import { create } from 'zustand';
-import type { Transforms, Adjustments, CropRegion } from '../types/editor';
+import type { Transforms, Adjustments, CropRegion, TextEntry, TextStyle } from '../types/editor';
 import { defaultTransforms, defaultAdjustments, defaultCrop } from '../types/editor';
 import { clampCrop, flipCropH, flipCropV, rotateCropCW, rotateCropCCW } from '../utils/crop';
 import { PRESETS } from '../utils/presets';
+import { DEFAULT_TEXT_ENTRY } from '../utils/text';
 
 interface EditorStore {
   // Image state
@@ -26,6 +27,11 @@ interface EditorStore {
   // Zoom/pan state
   zoomLevel: number;
   panOffset: { x: number; y: number };
+
+  // Text overlay state
+  textMode: boolean;
+  draftText: TextEntry | null;
+  bakedTexts: TextEntry[];
 
   // Background removal state
   backgroundRemoved: boolean;
@@ -52,6 +58,14 @@ interface EditorStore {
   clearBackgroundMask: () => void;
   setReplacementColor: (color: string | null) => void;
 
+  // Text actions
+  enterTextMode: () => void;
+  exitTextMode: () => void;
+  setDraftText: (updates: Partial<TextEntry>) => void;
+  setDraftStyle: (updates: Partial<TextStyle>) => void;
+  applyText: () => void;
+  discardText: () => void;
+
   // Crop actions
   enterCropMode: () => void;
   exitCropMode: () => void;
@@ -76,6 +90,9 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   cropAspectRatio: null,
   zoomLevel: 1,
   panOffset: { x: 0, y: 0 },
+  textMode: false,
+  draftText: null,
+  bakedTexts: [],
   backgroundRemoved: false,
   backgroundMask: null,
   replacementColor: null,
@@ -97,6 +114,9 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       cropRegion: null,
       cropMode: false,
       cropAspectRatio: null,
+      textMode: false,
+      draftText: null,
+      bakedTexts: [],
       backgroundRemoved: false,
       backgroundMask: null,
       replacementColor: null,
@@ -167,6 +187,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     transforms: { ...defaultTransforms },
     adjustments: { ...defaultAdjustments },
     activePreset: null,
+    textMode: false,
+    draftText: null,
     cropRegion: null,
     previousCropRegion: null,
     cropMode: false,
@@ -177,6 +199,22 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     zoomLevel: 1,
     panOffset: { x: 0, y: 0 },
   }),
+
+  enterTextMode: () => set({ textMode: true, draftText: { ...DEFAULT_TEXT_ENTRY, style: { ...DEFAULT_TEXT_ENTRY.style } } }),
+  exitTextMode: () => set({ textMode: false, draftText: null }),
+  setDraftText: (updates) => set((s) => {
+    if (!s.draftText) return {};
+    return { draftText: { ...s.draftText, ...updates } };
+  }),
+  setDraftStyle: (updates) => set((s) => {
+    if (!s.draftText) return {};
+    return { draftText: { ...s.draftText, style: { ...s.draftText.style, ...updates } } };
+  }),
+  applyText: () => set((s) => {
+    if (!s.draftText) return {};
+    return { bakedTexts: [...s.bakedTexts, s.draftText], draftText: null, textMode: false };
+  }),
+  discardText: () => set({ draftText: null, textMode: false }),
 
   setBackgroundMask: (mask) => set({ backgroundMask: mask, backgroundRemoved: true }),
   clearBackgroundMask: () => set({ backgroundMask: null, backgroundRemoved: false, replacementColor: null }),
@@ -231,6 +269,9 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       adjustments: { ...defaultAdjustments },
       cropRegion: null,
       cropMode: false,
+      textMode: false,
+      draftText: null,
+      bakedTexts: [],
       backgroundRemoved: false,
       backgroundMask: null,
       replacementColor: null,

@@ -60,6 +60,22 @@ export interface RenderOptions {
   crop?: CropRegion;
   backgroundMask?: ImageData | null;
   replacementColor?: string | null;
+  bakedTexts?: TextEntry[];
+}
+
+export interface TextStyle {
+  fontFamily: string;
+  fontSize: number;
+  color: string;
+  bold: boolean;
+  italic: boolean;
+}
+
+export interface TextEntry {
+  content: string;
+  x: number; // 0-100, percentage of post-crop image width
+  y: number; // 0-100, percentage of post-crop image height
+  style: TextStyle;
 }
 
 export interface CropPreset {

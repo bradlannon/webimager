@@ -13,6 +13,9 @@ describe('editorStore', () => {
       adjustments: { ...defaultAdjustments },
       cropRegion: null,
       cropMode: false,
+      textMode: false,
+      draftText: null,
+      bakedTexts: [],
       backgroundRemoved: false,
       backgroundMask: null,
       replacementColor: null,
@@ -426,6 +429,115 @@ describe('editorStore', () => {
       const mockFile = new File([''], 'test.jpg', { type: 'image/jpeg' })
       useEditorStore.getState().setImage(mockBitmap, mockFile, false)
       expect(useEditorStore.getState().activePreset).toBeNull()
+    })
+  })
+
+  describe('text mode', () => {
+    test('enterTextMode sets textMode=true and creates draftText with default values', () => {
+      useEditorStore.getState().enterTextMode()
+      const state = useEditorStore.getState()
+      expect(state.textMode).toBe(true)
+      expect(state.draftText).not.toBeNull()
+      expect(state.draftText!.content).toBe('Your text here')
+      expect(state.draftText!.x).toBe(50)
+      expect(state.draftText!.y).toBe(50)
+      expect(state.draftText!.style.fontFamily).toBe('Arial')
+      expect(state.draftText!.style.fontSize).toBe(48)
+      expect(state.draftText!.style.color).toBe('#000000')
+      expect(state.draftText!.style.bold).toBe(false)
+      expect(state.draftText!.style.italic).toBe(false)
+    })
+
+    test('setDraftText merges partial updates into draftText', () => {
+      useEditorStore.getState().enterTextMode()
+      useEditorStore.getState().setDraftText({ content: 'Hello', x: 25 })
+      const draft = useEditorStore.getState().draftText!
+      expect(draft.content).toBe('Hello')
+      expect(draft.x).toBe(25)
+      expect(draft.y).toBe(50) // unchanged
+    })
+
+    test('setDraftStyle merges partial style updates into draftText.style', () => {
+      useEditorStore.getState().enterTextMode()
+      useEditorStore.getState().setDraftStyle({ bold: true, color: '#FF0000' })
+      const style = useEditorStore.getState().draftText!.style
+      expect(style.bold).toBe(true)
+      expect(style.color).toBe('#FF0000')
+      expect(style.fontFamily).toBe('Arial') // unchanged
+    })
+
+    test('applyText pushes draftText to bakedTexts, clears draftText, exits textMode', () => {
+      useEditorStore.getState().enterTextMode()
+      useEditorStore.getState().setDraftText({ content: 'Baked!' })
+      useEditorStore.getState().applyText()
+      const state = useEditorStore.getState()
+      expect(state.textMode).toBe(false)
+      expect(state.draftText).toBeNull()
+      expect(state.bakedTexts).toHaveLength(1)
+      expect(state.bakedTexts[0].content).toBe('Baked!')
+    })
+
+    test('discardText clears draftText, exits textMode, does NOT affect bakedTexts', () => {
+      // First bake one text
+      useEditorStore.getState().enterTextMode()
+      useEditorStore.getState().applyText()
+      expect(useEditorStore.getState().bakedTexts).toHaveLength(1)
+
+      // Enter text mode again and discard
+      useEditorStore.getState().enterTextMode()
+      useEditorStore.getState().discardText()
+      const state = useEditorStore.getState()
+      expect(state.textMode).toBe(false)
+      expect(state.draftText).toBeNull()
+      expect(state.bakedTexts).toHaveLength(1) // preserved
+    })
+
+    test('resetAll clears draftText and textMode but preserves bakedTexts', () => {
+      useEditorStore.getState().enterTextMode()
+      useEditorStore.getState().applyText()
+      useEditorStore.getState().enterTextMode() // enter again with a draft
+      expect(useEditorStore.getState().bakedTexts).toHaveLength(1)
+
+      useEditorStore.getState().resetAll()
+      const state = useEditorStore.getState()
+      expect(state.textMode).toBe(false)
+      expect(state.draftText).toBeNull()
+      expect(state.bakedTexts).toHaveLength(1) // preserved!
+    })
+
+    test('setImage clears all text state including bakedTexts', () => {
+      useEditorStore.getState().enterTextMode()
+      useEditorStore.getState().applyText()
+      expect(useEditorStore.getState().bakedTexts).toHaveLength(1)
+
+      const mockBitmap = { close: () => {}, width: 100, height: 200 } as unknown as ImageBitmap
+      const mockFile = new File([''], 'test.jpg', { type: 'image/jpeg' })
+      useEditorStore.getState().setImage(mockBitmap, mockFile, false)
+
+      const state = useEditorStore.getState()
+      expect(state.textMode).toBe(false)
+      expect(state.draftText).toBeNull()
+      expect(state.bakedTexts).toHaveLength(0)
+    })
+
+    test('multiple applyText calls accumulate in bakedTexts array', () => {
+      useEditorStore.getState().enterTextMode()
+      useEditorStore.getState().setDraftText({ content: 'First' })
+      useEditorStore.getState().applyText()
+
+      useEditorStore.getState().enterTextMode()
+      useEditorStore.getState().setDraftText({ content: 'Second' })
+      useEditorStore.getState().applyText()
+
+      useEditorStore.getState().enterTextMode()
+      useEditorStore.getState().setDraftText({ content: 'Third' })
+      useEditorStore.getState().applyText()
+
+      const state = useEditorStore.getState()
+      expect(state.bakedTexts).toHaveLength(3)
+      expect(state.bakedTexts[0].content).toBe('First')
+      expect(state.bakedTexts[1].content).toBe('Second')
+      expect(state.bakedTexts[2].content).toBe('Third')
     })
   })
 
