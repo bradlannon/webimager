@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Editing Power
-status: completed
-stopped_at: Completed 11-02-PLAN.md
-last_updated: "2026-03-15T02:44:14.661Z"
-last_activity: 2026-03-15 — Completed 11-02 (blur/sharpen sliders with convolution kernel)
+status: in-progress
+stopped_at: Completed 12-01-PLAN.md
+last_updated: "2026-03-15T03:02:16Z"
+last_activity: 2026-03-15 — Completed 12-01 (preset filter data layer and store)
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 100
+  total_plans: 4
+  completed_plans: 3
+  percent: 92
 ---
 
 # Project State
@@ -21,21 +21,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-15)
 
 **Core value:** Users can quickly edit a photo and download the result without installing software, creating an account, or uploading to a server.
-**Current focus:** Phase 11 — Blur, Sharpen, and Safari Compatibility
+**Current focus:** Phase 12 — Preset Filters
 
 ## Current Position
 
-Phase: 11 of 14 (Blur, Sharpen, and Safari Compatibility) -- COMPLETE
-Plan: 2 of 2 (complete)
-Status: Phase 11 complete
-Last activity: 2026-03-15 — Completed 11-02 (blur/sharpen sliders with convolution kernel)
+Phase: 12 of 14 (Preset Filters)
+Plan: 1 of 2 (12-01 complete)
+Status: Phase 12 in progress
+Last activity: 2026-03-15 — Completed 12-01 (preset filter data layer and store)
 
-Progress: [██████████] 100%
+Progress: [█████████░] 92%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 21 (8 v1.0 + 11 v2.0 + 2 v3.0)
+- Total plans completed: 22 (8 v1.0 + 11 v2.0 + 3 v3.0)
 - Average duration: 6.5min
 - Total execution time: 1.75 hours
 
@@ -54,9 +54,10 @@ Progress: [██████████] 100%
 | 09-worker-lifecycle | 1/1 | 2min | 2min |
 | 10-restore-status | 1/1 | 1min | 1min |
 | 11-blur-sharpen-safari | 2/2 | 5min | 2.5min |
+| 12-preset-filters | 1/2 | 3min | 3min |
 
 **Recent Trend:**
-- Last 5 plans: 1min, 2min, 1min, 2min, 3min
+- Last 5 plans: 2min, 1min, 2min, 3min, 3min
 - Trend: Consistently fast execution
 
 ## Accumulated Context
@@ -75,6 +76,9 @@ Recent decisions affecting current work:
 - [11-01]: context-filter-polyfill imported at app entry for Safari ctx.filter support
 - [Phase 11]: Sharpen uses 3x3 unsharp mask convolution, blur uses CSS filter string (GPU-accelerated)
 - [Phase 11]: Blur/sharpen sliders use local state + 150ms debounce for smooth drag UX
+- [12-01]: Presets override all adjustment values (FILT-04), not compose
+- [12-01]: presetToCssFilter excludes sharpen (CSS filter cannot express convolution)
+- [12-01]: Manual slider change clears activePreset to indicate custom state
 
 ### Pending Todos
 
@@ -86,6 +90,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-15T02:41:19.185Z
-Stopped at: Completed 11-02-PLAN.md
+Last session: 2026-03-15T03:02:16Z
+Stopped at: Completed 12-01-PLAN.md
 Resume file: None
