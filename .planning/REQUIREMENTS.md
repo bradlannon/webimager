@@ -64,8 +64,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | BGREM-01 | Phase 4 | Complete |
-| BGREM-02 | Phase 4 | Complete |
-| BGREM-03 | Phase 4 | Complete |
+| BGREM-02 | Phase 4, Phase 9 (integration fix) | Complete |
+| BGREM-03 | Phase 4, Phase 9 (integration fix) | Complete |
 | BGREM-04 | Phase 8 (gap closure) | Complete |
 | BGREM-05 | Phase 8 (gap closure) | Complete |
 | BGREM-06 | Phase 5 | Complete |

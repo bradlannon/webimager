@@ -105,10 +105,25 @@ Plans:
 Plans:
 - [x] 08-01-PLAN.md — Fix restoreBackground toggle bug, applyResize background state, dead import cleanup
 
+### Phase 9: Worker Lifecycle & Dead Code Cleanup
+**Goal:** Fix background removal worker lifecycle so it survives tab switching, and remove dead code accumulated during v2.0 development
+**Depends on:** Phase 8
+**Requirements**: BGREM-02, BGREM-03
+**Gap Closure:** Closes gaps from v2.0 audit
+**Success Criteria** (what must be TRUE):
+  1. Background removal model download and inference continue running when user switches bottom bar tabs
+  2. Progress bar and loading indicators remain accurate after tab switching
+  3. No orphaned components in codebase (CropToolbar.tsx, PrivacyBadge.tsx removed or rewired)
+  4. No dead store actions (toggleBackground removed)
+**Plans**: TBD
+
+Plans:
+- [ ] 09-01-PLAN.md — Lift useBackgroundRemoval to persistent parent, remove dead code
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 4 → 5 → 6 → 7 → 8
+Phases execute in numeric order: 4 → 5 → 6 → 7 → 8 → 9
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -120,3 +135,4 @@ Phases execute in numeric order: 4 → 5 → 6 → 7 → 8
 | 6. Sidebar Redesign | 2/2 | Complete   | 2026-03-14 | 2026-03-14 |
 | 7. Pan and Zoom | 2/2 | Complete   | 2026-03-14 | - |
 | 8. BG Removal Bug Fixes | 1/1 | Complete | 2026-03-14 | 2026-03-14 |
+| 9. Worker Lifecycle & Dead Code | 0/1 | Pending | - | - |
