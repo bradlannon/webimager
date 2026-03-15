@@ -2,13 +2,14 @@
 
 ## Milestones
 
-- ✅ **v1.0 MVP** — Phases 1-3 (shipped 2026-03-14)
-- ✅ **v2.0 AI Background Removal** — Phases 4-10 (shipped 2026-03-15)
+- [x] **v1.0 MVP** — Phases 1-3 (shipped 2026-03-14)
+- [x] **v2.0 AI Background Removal** — Phases 4-10 (shipped 2026-03-15)
+- [ ] **v3.0 Editing Power** — Phases 11-14 (in progress)
 
 ## Phases
 
 <details>
-<summary>✅ v1.0 MVP (Phases 1-3) — SHIPPED 2026-03-14</summary>
+<summary>v1.0 MVP (Phases 1-3) — SHIPPED 2026-03-14</summary>
 
 - [x] Phase 1: Foundation (3/3 plans) — completed 2026-03-14
 - [x] Phase 2: Adjustments (2/2 plans) — completed 2026-03-14
@@ -19,7 +20,7 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details
 </details>
 
 <details>
-<summary>✅ v2.0 AI Background Removal (Phases 4-10) — SHIPPED 2026-03-15</summary>
+<summary>v2.0 AI Background Removal (Phases 4-10) — SHIPPED 2026-03-15</summary>
 
 - [x] Phase 4: Background Removal Engine (2/3 plans, 1 superseded) — completed 2026-03-14
 - [x] Phase 5: Export and Background Replacement (2/2 plans) — completed 2026-03-14
@@ -33,7 +34,68 @@ See: `.planning/milestones/v2.0-ROADMAP.md` for full details
 
 </details>
 
+### v3.0 Editing Power (In Progress)
+
+**Milestone Goal:** Add blur/sharpen sliders, preset filters, text overlay, and drawing/annotation tools — all editable-until-applied, all client-side.
+
+- [ ] **Phase 11: Blur, Sharpen, and Safari Compatibility** - Add blur/sharpen sliders to Adjustments panel and fix ctx.filter for Safari
+- [ ] **Phase 12: Preset Filters** - Add 8-10 visual preset filters with independent preset/adjustment model
+- [ ] **Phase 13: Text Overlay** - Add draggable text with font/size/color, editable until applied
+- [ ] **Phase 14: Drawing and Annotation** - Add freehand drawing and shape tools, editable until applied
+
+## Phase Details
+
+### Phase 11: Blur, Sharpen, and Safari Compatibility
+**Goal**: Users can blur and sharpen images with live preview, and all adjustments work correctly on Safari
+**Depends on**: Phase 10 (v2.0 complete)
+**Requirements**: FILT-01, FILT-02, FILT-05, COMPAT-01
+**Success Criteria** (what must be TRUE):
+  1. User can drag a blur slider and see the image blur in real time without UI freezes
+  2. User can drag a sharpen slider and see the image sharpen in real time
+  3. Blur and sharpen controls appear in the existing Adjustments panel (no new tab)
+  4. All adjustments (brightness, contrast, saturation, blur, sharpen) produce correct visual results in Safari
+  5. Exported images include blur/sharpen effects at full resolution
+**Plans**: TBD
+
+Note: This phase includes a prerequisite refactor of `renderToCanvas` from positional parameters to an options object, preventing signature churn across subsequent phases.
+
+### Phase 12: Preset Filters
+**Goal**: Users can apply named visual filters from a selection grid that compose with manual adjustments
+**Depends on**: Phase 11 (buildFilterString changes, Safari fix)
+**Requirements**: FILT-03, FILT-04
+**Success Criteria** (what must be TRUE):
+  1. User can select from 8-10 preset filters displayed in a visual grid
+  2. Selecting a preset changes the image appearance immediately; selecting "None" restores the unfiltered look
+  3. Preset filters compose with manual adjustments (brightness, contrast, etc.) without destroying manual values
+  4. Exported images include the active preset filter
+**Plans**: TBD
+
+### Phase 13: Text Overlay
+**Goal**: Users can add styled text to images with drag positioning, editable until explicitly applied
+**Depends on**: Phase 12 (tab pattern established)
+**Requirements**: TEXT-01, TEXT-02, TEXT-03, TEXT-04
+**Success Criteria** (what must be TRUE):
+  1. User can add text with selectable font, adjustable size, and color picker
+  2. User can drag text to any position on the canvas, including while zoomed/panned
+  3. User can edit text content, change font/size/color, and reposition until clicking "Apply"
+  4. After applying, text is permanently baked into the image and appears in exported files
+**Plans**: TBD
+
+### Phase 14: Drawing and Annotation
+**Goal**: Users can draw freehand and add shape annotations, editable until explicitly applied
+**Depends on**: Phase 13 (overlay pattern and screenToCanvas utility established)
+**Requirements**: DRAW-01, DRAW-02, DRAW-03, DRAW-04
+**Success Criteria** (what must be TRUE):
+  1. User can draw smooth freehand strokes on the image with selectable color and thickness
+  2. User can add arrow, rectangle, circle, and line shapes with selectable color and thickness
+  3. Drawing elements remain visible and editable (with per-stroke undo and clear-all) until clicking "Apply"
+  4. After applying, drawings are permanently baked into the image and appear in exported files
+**Plans**: TBD
+
 ## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 11 -> 12 -> 13 -> 14
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -47,3 +109,11 @@ See: `.planning/milestones/v2.0-ROADMAP.md` for full details
 | 8. BG Removal Bug Fixes | v2.0 | 1/1 | Complete | 2026-03-14 |
 | 9. Worker Lifecycle & Dead Code | v2.0 | 1/1 | Complete | 2026-03-15 |
 | 10. Restore Status Fix | v2.0 | 1/1 | Complete | 2026-03-15 |
+| 11. Blur, Sharpen, Safari | v3.0 | 0/TBD | Not started | - |
+| 12. Preset Filters | v3.0 | 0/TBD | Not started | - |
+| 13. Text Overlay | v3.0 | 0/TBD | Not started | - |
+| 14. Drawing and Annotation | v3.0 | 0/TBD | Not started | - |
+
+---
+*Roadmap created: 2026-03-14 (v1.0), updated for v2.0 2026-03-14, updated for v3.0 2026-03-14*
+*Last updated: 2026-03-14*

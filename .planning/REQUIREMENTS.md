@@ -65,26 +65,26 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FILT-01 | — | Pending |
-| FILT-02 | — | Pending |
-| FILT-03 | — | Pending |
-| FILT-04 | — | Pending |
-| FILT-05 | — | Pending |
-| COMPAT-01 | — | Pending |
-| TEXT-01 | — | Pending |
-| TEXT-02 | — | Pending |
-| TEXT-03 | — | Pending |
-| TEXT-04 | — | Pending |
-| DRAW-01 | — | Pending |
-| DRAW-02 | — | Pending |
-| DRAW-03 | — | Pending |
-| DRAW-04 | — | Pending |
+| FILT-01 | Phase 11 | Pending |
+| FILT-02 | Phase 11 | Pending |
+| FILT-03 | Phase 12 | Pending |
+| FILT-04 | Phase 12 | Pending |
+| FILT-05 | Phase 11 | Pending |
+| COMPAT-01 | Phase 11 | Pending |
+| TEXT-01 | Phase 13 | Pending |
+| TEXT-02 | Phase 13 | Pending |
+| TEXT-03 | Phase 13 | Pending |
+| TEXT-04 | Phase 13 | Pending |
+| DRAW-01 | Phase 14 | Pending |
+| DRAW-02 | Phase 14 | Pending |
+| DRAW-03 | Phase 14 | Pending |
+| DRAW-04 | Phase 14 | Pending |
 
 **Coverage:**
 - v3.0 requirements: 14 total
-- Mapped to phases: 0
-- Unmapped: 14
+- Mapped to phases: 14
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-15*
-*Last updated: 2026-03-15 after initial definition*
+*Last updated: 2026-03-14 after roadmap creation*
