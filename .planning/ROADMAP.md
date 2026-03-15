@@ -87,7 +87,11 @@ Plans:
   2. User can drag text to any position on the canvas, including while zoomed/panned
   3. User can edit text content, change font/size/color, and reposition until clicking "Apply"
   4. After applying, text is permanently baked into the image and appears in exported files
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 13-01-PLAN.md — Text types, store state, constants, and canvas baking pipeline
+- [ ] 13-02-PLAN.md — TextOverlay and TextControls components, BottomBar/Canvas integration
 
 ### Phase 14: Drawing and Annotation
 **Goal**: Users can draw freehand and add shape annotations, editable until explicitly applied
@@ -118,8 +122,8 @@ Phases execute in numeric order: 11 -> 12 -> 13 -> 14
 | 9. Worker Lifecycle & Dead Code | v2.0 | 1/1 | Complete | 2026-03-15 |
 | 10. Restore Status Fix | v2.0 | 1/1 | Complete | 2026-03-15 |
 | 11. Blur, Sharpen, Safari | v3.0 | 2/2 | Complete | 2026-03-15 |
-| 12. Preset Filters | 2/2 | Complete   | 2026-03-15 | - |
-| 13. Text Overlay | v3.0 | 0/TBD | Not started | - |
+| 12. Preset Filters | v3.0 | 2/2 | Complete | 2026-03-15 |
+| 13. Text Overlay | v3.0 | 0/2 | Not started | - |
 | 14. Drawing and Annotation | v3.0 | 0/TBD | Not started | - |
 
 ---
