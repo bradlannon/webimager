@@ -13,7 +13,7 @@ Requirements for v2.0 milestone. Each maps to roadmap phases.
 - [x] **BGREM-02**: User sees a progress bar during model download on first use (~45MB)
 - [x] **BGREM-03**: User sees a progress/loading indicator during background removal inference
 - [x] **BGREM-04**: Transparent areas display on checkerboard background
-- [ ] **BGREM-05**: User can restore the original background with one click
+- [x] **BGREM-05**: User can restore the original background with one click
 - [x] **BGREM-06**: User can replace transparent background with a solid color (white, black, or custom picker)
 
 ### Export Integration
@@ -67,7 +67,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BGREM-02 | Phase 4, Phase 9 (integration fix) | Complete |
 | BGREM-03 | Phase 4, Phase 9 (integration fix) | Complete |
 | BGREM-04 | Phase 8 (gap closure) | Complete |
-| BGREM-05 | Phase 10 (gap closure) | Pending |
+| BGREM-05 | Phase 10 (gap closure) | Complete |
 | BGREM-06 | Phase 5 | Complete |
 | EXPT-01 | Phase 5 | Complete |
 | EXPT-02 | Phase 5 | Complete |
