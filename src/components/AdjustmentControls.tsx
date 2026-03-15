@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Palette } from 'lucide-react';
 import { useEditorStore } from '../store/editorStore';
+import { PresetGrid } from './PresetGrid';
 import type { Adjustments } from '../types/editor';
 
 const sliders: { key: keyof Omit<Adjustments, 'greyscale' | 'blur' | 'sharpen'>; label: string }[] = [
@@ -10,7 +11,25 @@ const sliders: { key: keyof Omit<Adjustments, 'greyscale' | 'blur' | 'sharpen'>;
 ];
 
 export function AdjustmentControls() {
-  const { adjustments, setAdjustment, toggleGreyscale } = useEditorStore();
+  const { adjustments, setAdjustment, toggleGreyscale, sourceImage, activePreset, setPreset } = useEditorStore();
+
+  // Thumbnail for preset previews
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!sourceImage) {
+      setThumbnailUrl(null);
+      return;
+    }
+    const size = 64;
+    const canvas = document.createElement('canvas');
+    const aspect = sourceImage.width / sourceImage.height;
+    canvas.width = aspect >= 1 ? size : Math.round(size * aspect);
+    canvas.height = aspect >= 1 ? Math.round(size / aspect) : size;
+    const ctx = canvas.getContext('2d')!;
+    ctx.drawImage(sourceImage, 0, 0, canvas.width, canvas.height);
+    setThumbnailUrl(canvas.toDataURL('image/jpeg', 0.6));
+  }, [sourceImage]);
 
   // Local state for debounced blur/sharpen sliders
   const [localBlur, setLocalBlur] = useState(adjustments.blur);
@@ -39,6 +58,8 @@ export function AdjustmentControls() {
 
   return (
     <div className="space-y-3">
+      <PresetGrid thumbnailUrl={thumbnailUrl} activePreset={activePreset} onSelect={setPreset} />
+      <hr className="border-neutral-200" />
       {sliders.map(({ key, label }) => (
         <div key={key}>
           <div className="flex items-center justify-between mb-1">
