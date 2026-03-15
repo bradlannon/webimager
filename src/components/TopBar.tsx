@@ -46,6 +46,13 @@ export function TopBar({ showEditorActions = true }: TopBarProps) {
           >
             A/V
           </a>
+          <a
+            href="https://bradlannon.ca/index.html#about"
+            className="no-underline text-[#6B6B6B] hover:text-[#2A9D8F] transition-colors"
+            style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' as const }}
+          >
+            About me
+          </a>
         </nav>
 
         {/* Right side actions */}
