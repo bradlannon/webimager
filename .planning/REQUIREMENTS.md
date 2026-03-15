@@ -9,11 +9,11 @@ Requirements for v3.0 milestone. Each maps to roadmap phases.
 
 ### Filters
 
-- [ ] **FILT-01**: User can blur the image with an adjustable intensity slider
-- [ ] **FILT-02**: User can sharpen the image with an adjustable intensity slider
+- [x] **FILT-01**: User can blur the image with an adjustable intensity slider
+- [x] **FILT-02**: User can sharpen the image with an adjustable intensity slider
 - [ ] **FILT-03**: User can apply preset filters (sepia, vintage, warm, cool, B&W, fade, vivid, dramatic, film grain, matte) from a visual grid
 - [ ] **FILT-04**: Selecting a preset overrides manual adjustment values; "None" preset restores defaults
-- [ ] **FILT-05**: Blur/sharpen and preset filters are integrated into the existing Adjustments panel (no new tab)
+- [x] **FILT-05**: Blur/sharpen and preset filters are integrated into the existing Adjustments panel (no new tab)
 
 ### Compatibility
 
@@ -65,11 +65,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FILT-01 | Phase 11 | Pending |
-| FILT-02 | Phase 11 | Pending |
+| FILT-01 | Phase 11 | Complete |
+| FILT-02 | Phase 11 | Complete |
 | FILT-03 | Phase 12 | Pending |
 | FILT-04 | Phase 12 | Pending |
-| FILT-05 | Phase 11 | Pending |
+| FILT-05 | Phase 11 | Complete |
 | COMPAT-01 | Phase 11 | Complete |
 | TEXT-01 | Phase 13 | Pending |
 | TEXT-02 | Phase 13 | Pending |
