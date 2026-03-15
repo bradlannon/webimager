@@ -1,7 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { buildFilterString, renderToCanvas } from '../utils/canvas'
 import { defaultAdjustments } from '../types/editor'
-import type { Transforms } from '../types/editor'
+import type { Transforms, TextEntry } from '../types/editor'
 
 // BGREM-06: renderToCanvas replacement color — destination-over compositing
 describe('renderToCanvas replacement color', () => {
@@ -222,4 +222,122 @@ describe('buildFilterString', () => {
     const result = buildFilterString({ ...defaultAdjustments, hueRotate: 0 })
     expect(result).not.toContain('hue-rotate')
   })
+})
+
+describe('text baking', () => {
+  let transforms: Transforms;
+  let source: ImageBitmap;
+
+  function createMockCtx() {
+    const fillTextCalls: unknown[][] = [];
+    const fontValues: string[] = [];
+    const fillStyleValues: string[] = [];
+    const textBaselineValues: string[] = [];
+
+    const ctx = {
+      canvas: { width: 200, height: 100 },
+      save: vi.fn(),
+      restore: vi.fn(),
+      translate: vi.fn(),
+      rotate: vi.fn(),
+      scale: vi.fn(),
+      drawImage: vi.fn(),
+      putImageData: vi.fn(),
+      fillRect: vi.fn(),
+      fillText: vi.fn((...args: unknown[]) => { fillTextCalls.push(args); }),
+      get font() { return fontValues[fontValues.length - 1] ?? ''; },
+      set font(v: string) { fontValues.push(v); },
+      get fillStyle() { return fillStyleValues[fillStyleValues.length - 1] ?? ''; },
+      set fillStyle(v: string) { fillStyleValues.push(v); },
+      get textBaseline() { return textBaselineValues[textBaselineValues.length - 1] ?? 'alphabetic'; },
+      set textBaseline(v: string) { textBaselineValues.push(v); },
+      filter: 'none',
+      globalCompositeOperation: 'source-over',
+    } as unknown as CanvasRenderingContext2D;
+
+    Object.defineProperty(ctx, 'canvas', {
+      value: { width: 200, height: 100 },
+      writable: true,
+      configurable: true,
+    });
+
+    return { ctx, fillTextCalls, fontValues, fillStyleValues };
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal('document', {
+      createElement: vi.fn(() => ({
+        width: 0,
+        height: 0,
+        getContext: vi.fn(() => ({
+          save: vi.fn(),
+          restore: vi.fn(),
+          translate: vi.fn(),
+          rotate: vi.fn(),
+          scale: vi.fn(),
+          drawImage: vi.fn(),
+          putImageData: vi.fn(),
+          fillRect: vi.fn(),
+          globalCompositeOperation: 'source-over',
+          fillStyle: '',
+          filter: 'none',
+        })),
+      })),
+    });
+
+    transforms = { rotation: 0, freeRotation: 0, flipH: false, flipV: false };
+    source = { width: 200, height: 100, close: vi.fn() } as unknown as ImageBitmap;
+  });
+
+  const makeEntry = (overrides?: Partial<TextEntry>): TextEntry => ({
+    content: 'Hello',
+    x: 50,
+    y: 50,
+    style: { fontFamily: 'Arial', fontSize: 48, color: '#FF0000', bold: false, italic: false },
+    ...overrides,
+  });
+
+  test('renderToCanvas calls ctx.fillText when bakedTexts provided', () => {
+    const { ctx, fillTextCalls } = createMockCtx();
+    const entry = makeEntry();
+    renderToCanvas(ctx, source, { transforms, adjustments: defaultAdjustments, bakedTexts: [entry] });
+    expect(fillTextCalls.length).toBe(1);
+    expect(fillTextCalls[0][0]).toBe('Hello');
+  });
+
+  test('font string is composed correctly with italic and bold', () => {
+    const { ctx, fontValues } = createMockCtx();
+    const entry = makeEntry({ style: { fontFamily: 'Georgia', fontSize: 24, color: '#000', bold: true, italic: true } });
+    renderToCanvas(ctx, source, { transforms, adjustments: defaultAdjustments, bakedTexts: [entry] });
+    expect(fontValues).toContain('italic bold 24px Georgia');
+  });
+
+  test('position is converted from percentage to pixels', () => {
+    const { ctx, fillTextCalls } = createMockCtx();
+    // canvas is 200x100, x=50 -> 100px, y=50 -> 50px
+    const entry = makeEntry({ x: 50, y: 50 });
+    renderToCanvas(ctx, source, { transforms, adjustments: defaultAdjustments, bakedTexts: [entry] });
+    expect(fillTextCalls[0][1]).toBe(100); // x: 50% of 200
+    expect(fillTextCalls[0][2]).toBe(50);  // y: 50% of 100
+  });
+
+  test('multiple bakedTexts entries are all rendered', () => {
+    const { ctx, fillTextCalls } = createMockCtx();
+    const entries = [
+      makeEntry({ content: 'First' }),
+      makeEntry({ content: 'Second' }),
+      makeEntry({ content: 'Third' }),
+    ];
+    renderToCanvas(ctx, source, { transforms, adjustments: defaultAdjustments, bakedTexts: entries });
+    expect(fillTextCalls.length).toBe(3);
+    expect(fillTextCalls[0][0]).toBe('First');
+    expect(fillTextCalls[1][0]).toBe('Second');
+    expect(fillTextCalls[2][0]).toBe('Third');
+  });
+
+  test('empty bakedTexts array does not call fillText', () => {
+    const { ctx, fillTextCalls } = createMockCtx();
+    renderToCanvas(ctx, source, { transforms, adjustments: defaultAdjustments, bakedTexts: [] });
+    expect(fillTextCalls.length).toBe(0);
+  });
 })

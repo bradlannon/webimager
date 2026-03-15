@@ -1,4 +1,4 @@
-import type { Transforms, Adjustments, CropRegion } from '../types/editor';
+import type { Transforms, Adjustments, CropRegion, TextEntry } from '../types/editor';
 import { renderToCanvas } from './canvas';
 
 /**
@@ -14,13 +14,14 @@ export function downloadImage(
   filename?: string,
   crop?: CropRegion,
   backgroundMask?: ImageData | null,
-  replacementColor?: string | null
+  replacementColor?: string | null,
+  bakedTexts?: TextEntry[]
 ): void {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  renderToCanvas(ctx, source, { transforms, adjustments, crop, backgroundMask, replacementColor });
+  renderToCanvas(ctx, source, { transforms, adjustments, crop, backgroundMask, replacementColor, bakedTexts });
 
   const ext = format === 'image/jpeg' ? '.jpg' : '.png';
   const qualityParam = format === 'image/jpeg' ? quality : undefined;

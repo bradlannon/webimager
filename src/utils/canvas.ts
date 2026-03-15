@@ -1,6 +1,24 @@
-import type { Transforms, Adjustments, CropRegion, RenderOptions } from '../types/editor';
+import type { Transforms, Adjustments, CropRegion, RenderOptions, TextEntry } from '../types/editor';
 import { cropToPixels } from './crop';
 import { applySharpen } from './sharpen';
+
+function bakeTexts(ctx: CanvasRenderingContext2D, texts: TextEntry[]): void {
+  for (const entry of texts) {
+    ctx.save();
+    const parts: string[] = [];
+    if (entry.style.italic) parts.push('italic');
+    if (entry.style.bold) parts.push('bold');
+    parts.push(`${entry.style.fontSize}px`);
+    parts.push(entry.style.fontFamily);
+    ctx.font = parts.join(' ');
+    ctx.fillStyle = entry.style.color;
+    ctx.textBaseline = 'top';
+    const px = (entry.x / 100) * ctx.canvas.width;
+    const py = (entry.y / 100) * ctx.canvas.height;
+    ctx.fillText(entry.content, px, py);
+    ctx.restore();
+  }
+}
 
 export const MAX_CANVAS_PIXELS = 16_777_216;
 
@@ -40,7 +58,7 @@ export function renderToCanvas(
   source: ImageBitmap,
   options: RenderOptions
 ): void {
-  const { transforms, adjustments, crop, backgroundMask, replacementColor } = options;
+  const { transforms, adjustments, crop, backgroundMask, replacementColor, bakedTexts } = options;
   const { rotation, freeRotation = 0, flipH, flipV } = transforms;
   const totalRotation = rotation + freeRotation;
   const isRotated90 = rotation === 90 || rotation === 270;
@@ -124,6 +142,11 @@ export function renderToCanvas(
       ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
       ctx.globalCompositeOperation = 'source-over';
     }
+
+    // Bake text entries on top of everything
+    if (bakedTexts?.length) {
+      bakeTexts(ctx, bakedTexts);
+    }
   } else {
     // No crop: existing fast path
     ctx.canvas.width = rotatedW;
@@ -175,6 +198,11 @@ export function renderToCanvas(
       ctx.fillStyle = replacementColor;
       ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
       ctx.globalCompositeOperation = 'source-over';
+    }
+
+    // Bake text entries on top of everything
+    if (bakedTexts?.length) {
+      bakeTexts(ctx, bakedTexts);
     }
   }
 }

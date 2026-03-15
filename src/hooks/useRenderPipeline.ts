@@ -11,6 +11,7 @@ export function useRenderPipeline(canvasRef: RefObject<HTMLCanvasElement | null>
   const backgroundRemoved = useEditorStore((s) => s.backgroundRemoved);
   const backgroundMask = useEditorStore((s) => s.backgroundMask);
   const replacementColor = useEditorStore((s) => s.replacementColor);
+  const bakedTexts = useEditorStore((s) => s.bakedTexts);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -31,9 +32,9 @@ export function useRenderPipeline(canvasRef: RefObject<HTMLCanvasElement | null>
     const activeReplacementColor = backgroundRemoved ? replacementColor : undefined;
 
     // Render the image with transforms, adjustments, optional crop, optional mask, and replacement color
-    renderToCanvas(ctx, sourceImage, { transforms, adjustments, crop: activeCrop, backgroundMask: activeMask, replacementColor: activeReplacementColor });
+    renderToCanvas(ctx, sourceImage, { transforms, adjustments, crop: activeCrop, backgroundMask: activeMask, replacementColor: activeReplacementColor, bakedTexts });
 
     // Draw checkerboard behind image on a separate pass
     // (The checkerboard is drawn underneath via CSS or a background canvas)
-  }, [canvasRef, sourceImage, transforms, adjustments, cropRegion, cropMode, backgroundRemoved, backgroundMask, replacementColor]);
+  }, [canvasRef, sourceImage, transforms, adjustments, cropRegion, cropMode, backgroundRemoved, backgroundMask, replacementColor, bakedTexts]);
 }
