@@ -39,7 +39,7 @@ See: `.planning/milestones/v2.0-ROADMAP.md` for full details
 **Milestone Goal:** Add blur/sharpen sliders, preset filters, text overlay, and drawing/annotation tools — all editable-until-applied, all client-side.
 
 - [x] **Phase 11: Blur, Sharpen, and Safari Compatibility** - Add blur/sharpen sliders to Adjustments panel and fix ctx.filter for Safari (completed 2026-03-15)
-- [ ] **Phase 12: Preset Filters** - Add 8-10 visual preset filters with independent preset/adjustment model
+- [x] **Phase 12: Preset Filters** - Add 8-10 visual preset filters with independent preset/adjustment model (completed 2026-03-15)
 - [ ] **Phase 13: Text Overlay** - Add draggable text with font/size/color, editable until applied
 - [ ] **Phase 14: Drawing and Annotation** - Add freehand drawing and shape tools, editable until applied
 
@@ -118,7 +118,7 @@ Phases execute in numeric order: 11 -> 12 -> 13 -> 14
 | 9. Worker Lifecycle & Dead Code | v2.0 | 1/1 | Complete | 2026-03-15 |
 | 10. Restore Status Fix | v2.0 | 1/1 | Complete | 2026-03-15 |
 | 11. Blur, Sharpen, Safari | v3.0 | 2/2 | Complete | 2026-03-15 |
-| 12. Preset Filters | 1/2 | In Progress|  | - |
+| 12. Preset Filters | 2/2 | Complete   | 2026-03-15 | - |
 | 13. Text Overlay | v3.0 | 0/TBD | Not started | - |
 | 14. Drawing and Annotation | v3.0 | 0/TBD | Not started | - |
 
