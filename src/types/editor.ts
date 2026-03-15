@@ -46,6 +46,14 @@ export interface CropRegion {
 
 export const defaultCrop: CropRegion = { x: 0, y: 0, width: 100, height: 100 };
 
+export interface RenderOptions {
+  transforms: Transforms;
+  adjustments?: Adjustments;
+  crop?: CropRegion;
+  backgroundMask?: ImageData | null;
+  replacementColor?: string | null;
+}
+
 export interface CropPreset {
   label: string;
   ratio: number | null; // null = free crop (no constraint)

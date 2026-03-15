@@ -1,4 +1,4 @@
-import type { Transforms, Adjustments, CropRegion } from '../types/editor';
+import type { Transforms, Adjustments, CropRegion, RenderOptions } from '../types/editor';
 import { cropToPixels } from './crop';
 
 export const MAX_CANVAS_PIXELS = 16_777_216;
@@ -34,12 +34,9 @@ export function buildFilterString(adjustments: Adjustments): string {
 export function renderToCanvas(
   ctx: CanvasRenderingContext2D,
   source: ImageBitmap,
-  transforms: Transforms,
-  adjustments?: Adjustments,
-  crop?: CropRegion,
-  backgroundMask?: ImageData | null,
-  replacementColor?: string | null
+  options: RenderOptions
 ): void {
+  const { transforms, adjustments, crop, backgroundMask, replacementColor } = options;
   const { rotation, freeRotation = 0, flipH, flipV } = transforms;
   const totalRotation = rotation + freeRotation;
   const isRotated90 = rotation === 90 || rotation === 270;
