@@ -143,6 +143,7 @@ export function useBackgroundRemoval() {
 
   const restoreBackground = useCallback(() => {
     useEditorStore.getState().clearBackgroundMask();
+    setStatus('idle');
   }, []);
 
   // Clean up worker on unmount
