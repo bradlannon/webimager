@@ -115,7 +115,7 @@ Plans:
   2. Progress bar and loading indicators remain accurate after tab switching
   3. No orphaned components in codebase (CropToolbar.tsx, PrivacyBadge.tsx removed or rewired)
   4. No dead store actions (toggleBackground removed)
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
 - [ ] 09-01-PLAN.md — Lift useBackgroundRemoval to persistent parent, remove dead code
