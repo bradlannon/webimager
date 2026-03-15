@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Editing Power
 status: executing
-stopped_at: Completed 13-02-PLAN.md
-last_updated: "2026-03-15T05:06:28.736Z"
+stopped_at: Completed 13-02 UX fixes (auto-apply, resize, panel dismiss)
+last_updated: "2026-03-15T05:27:36.449Z"
 last_activity: 2026-03-15 — Completed 13-01 (text overlay data layer)
 progress:
   total_phases: 4
@@ -87,6 +87,8 @@ Recent decisions affecting current work:
 - [13-01]: bakeTexts helper extracts text rendering to avoid duplication in crop/no-crop paths
 - [Phase 13]: Text panel is collapsible without discarding draft for full canvas visibility during text positioning
 - [Phase 13]: Baked text uses stroke outline for contrast visibility on any photo background
+- [Phase 13]: Tab switch auto-APPLIES text (bakes into image) instead of discarding -- user intent is to keep text
+- [Phase 13]: Text overlay has resize handles at corners for proportional font size adjustment
 
 ### Pending Todos
 
@@ -98,6 +100,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-15T05:06:28.731Z
-Stopped at: Completed 13-02-PLAN.md
+Last session: 2026-03-15T05:27:36.444Z
+Stopped at: Completed 13-02 UX fixes (auto-apply, resize, panel dismiss)
 Resume file: None

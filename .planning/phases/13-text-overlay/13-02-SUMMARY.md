@@ -10,7 +10,7 @@ requires:
 provides:
   - "TextOverlay component with draggable text, snap-to-center guides, Apply/Cancel buttons"
   - "TextControls panel with text input, font selector, size slider, bold/italic, color swatches + hex"
-  - "Text tab in BottomBar with auto-discard on tab switch and collapsible panel"
+  - "Text tab in BottomBar with auto-APPLY on tab switch and collapsible panel"
   - "TextOverlay conditional render in Canvas when textMode active"
   - "Text stroke outline in bakeTexts for visibility on any background"
 affects: [download, canvas-rendering]
@@ -36,6 +36,8 @@ key-decisions:
   - "Text panel is collapsible without discarding draft -- user can hide panel to see full canvas while positioning text"
   - "Text overlay stays draggable whenever textMode is active, regardless of panel visibility"
   - "Baked text uses stroke outline for visibility on any background color"
+  - "Tab switch auto-APPLIES text (bakes into image) instead of discarding"
+  - "Text overlay has resize handles at all four corners for proportional font size adjustment"
 
 patterns-established:
   - "Collapsible panel: tab toggles panel open/closed without destroying active mode state"
@@ -61,10 +63,12 @@ completed: 2026-03-15
 
 ## Accomplishments
 - Complete text overlay UI: Add Text button, font/size/color/bold/italic controls, draggable canvas overlay with snap guides
-- Text tab in bottom bar with auto-discard on tab switch
+- Text tab in bottom bar with auto-APPLY on tab switch (bakes text into image)
 - Collapsible panel allows hiding controls to see full canvas while positioning text
 - Text remains draggable with Apply/Cancel buttons visible regardless of panel state
+- Text is resizable via corner handles (proportional font size adjustment)
 - Baked text uses stroke outline for visibility on any background
+- Panel dismiss on background tap closes panel but keeps text mode active
 
 ## Task Commits
 
@@ -74,11 +78,12 @@ Each task was committed atomically:
 2. **Task 2: TextControls panel and TextOverlay component** - `17d4e9c` (feat)
 3. **Task 3: Wire Text tab into BottomBar and Canvas** - `bed33eb` (feat)
 4. **Task 4: Fix apply, collapsible panel, persistent drag** - `6617ea6` (fix)
+5. **Task 5: UX fixes -- auto-apply on tab switch, resize handles, panel dismiss** - `fae69c4` (fix)
 
 ## Files Created/Modified
-- `src/components/TextOverlay.tsx` - Draggable text overlay with snap guides and Apply/Cancel
+- `src/components/TextOverlay.tsx` - Draggable + resizable text overlay with snap guides, resize handles, Apply/Cancel
 - `src/components/TextControls.tsx` - Panel with text input, font selector, size slider, bold/italic, color swatches + hex
-- `src/components/BottomBar.tsx` - Text tab, auto-discard on tab switch, collapsible panel without discarding draft
+- `src/components/BottomBar.tsx` - Text tab, auto-APPLY on tab switch, collapsible panel without discarding draft
 - `src/components/Canvas.tsx` - Conditional TextOverlay render, pan disabled during text mode
 - `src/utils/canvas.ts` - Text stroke outline in bakeTexts for visibility
 - `src/__tests__/textOverlay.test.ts` - Unit tests for dragDeltaToPercent, clampPosition, detectCenterSnap
@@ -88,7 +93,9 @@ Each task was committed atomically:
 - Text panel is collapsible without discarding draft -- user can hide panel to see full canvas while positioning text
 - Text overlay stays draggable whenever textMode is active, regardless of panel visibility
 - Baked text uses stroke outline (contrasting color) for visibility on any background
-- Backdrop disabled during text mode so user can interact with canvas through overlay
+- Tab switch auto-APPLIES text (bakes into image) instead of discarding -- user intent is to keep text
+- Text overlay has resize handles at all four corners for proportional font size adjustment
+- Panel dismiss on background tap closes panel but keeps text mode and draft text active
 
 ## Deviations from Plan
 
@@ -118,9 +125,33 @@ Each task was committed atomically:
 - **Verification:** Text overlay with drag handles persists when panel is collapsed
 - **Committed in:** 6617ea6
 
+**4. [Rule 1 - Bug] Tab switch auto-applies text instead of discarding**
+- **Found during:** Post-checkpoint user feedback
+- **Issue:** User expected tab switch to SAVE/APPLY text, not discard it
+- **Fix:** Changed BottomBar handleTabClick to call applyText() instead of discardText() when switching away from text tab
+- **Files modified:** src/components/BottomBar.tsx
+- **Verification:** All 239 tests pass
+- **Committed in:** fae69c4
+
+**5. [Rule 2 - Missing Critical] Text resize handles**
+- **Found during:** Post-checkpoint user feedback
+- **Issue:** User expected to be able to resize text by dragging corners, not just the slider
+- **Fix:** Added four corner resize handles to TextOverlay that proportionally adjust font size via pointer drag
+- **Files modified:** src/components/TextOverlay.tsx
+- **Verification:** All 239 tests pass
+- **Committed in:** fae69c4
+
+**6. [Rule 1 - Bug] Panel dismiss keeps text mode active**
+- **Found during:** Post-checkpoint user feedback
+- **Issue:** Backdrop was disabled during text mode; user wanted to tap background to close panel while keeping text active
+- **Fix:** Re-enabled backdrop for text mode; panel close just hides panel, text overlay stays draggable/resizable
+- **Files modified:** src/components/BottomBar.tsx
+- **Verification:** All 239 tests pass
+- **Committed in:** fae69c4
+
 ---
 
-**Total deviations:** 3 auto-fixed (2 bug fixes, 1 missing critical)
+**Total deviations:** 6 auto-fixed (4 bug fixes, 2 missing critical)
 **Impact on plan:** All fixes address user-reported usability issues from checkpoint verification. No scope creep.
 
 ## Issues Encountered
@@ -136,7 +167,7 @@ None - no external service configuration required.
 
 ## Self-Check: PASSED
 
-All 7 files verified present. All 4 commit hashes verified in git log. 239/239 tests passing.
+All 7 files verified present. All 5 commit hashes verified in git log. 239/239 tests passing.
 
 ---
 *Phase: 13-text-overlay*
