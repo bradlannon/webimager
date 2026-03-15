@@ -64,15 +64,19 @@ Plans:
 Note: This phase includes a prerequisite refactor of `renderToCanvas` from positional parameters to an options object, preventing signature churn across subsequent phases.
 
 ### Phase 12: Preset Filters
-**Goal**: Users can apply named visual filters from a selection grid that compose with manual adjustments
+**Goal**: Users can apply named visual filters from a selection grid that override manual adjustments
 **Depends on**: Phase 11 (buildFilterString changes, Safari fix)
 **Requirements**: FILT-03, FILT-04
 **Success Criteria** (what must be TRUE):
   1. User can select from 8-10 preset filters displayed in a visual grid
   2. Selecting a preset changes the image appearance immediately; selecting "None" restores the unfiltered look
-  3. Preset filters compose with manual adjustments (brightness, contrast, etc.) without destroying manual values
+  3. Preset filters override manual adjustment values (per FILT-04); "None" restores defaults
   4. Exported images include the active preset filter
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 12-01-PLAN.md — Extend Adjustments type, buildFilterString, preset definitions, store actions
+- [ ] 12-02-PLAN.md — PresetGrid component and AdjustmentControls integration
 
 ### Phase 13: Text Overlay
 **Goal**: Users can add styled text to images with drag positioning, editable until explicitly applied
@@ -113,8 +117,8 @@ Phases execute in numeric order: 11 -> 12 -> 13 -> 14
 | 8. BG Removal Bug Fixes | v2.0 | 1/1 | Complete | 2026-03-14 |
 | 9. Worker Lifecycle & Dead Code | v2.0 | 1/1 | Complete | 2026-03-15 |
 | 10. Restore Status Fix | v2.0 | 1/1 | Complete | 2026-03-15 |
-| 11. Blur, Sharpen, Safari | 2/2 | Complete    | 2026-03-15 | - |
-| 12. Preset Filters | v3.0 | 0/TBD | Not started | - |
+| 11. Blur, Sharpen, Safari | v3.0 | 2/2 | Complete | 2026-03-15 |
+| 12. Preset Filters | v3.0 | 0/2 | Not started | - |
 | 13. Text Overlay | v3.0 | 0/TBD | Not started | - |
 | 14. Drawing and Annotation | v3.0 | 0/TBD | Not started | - |
 
